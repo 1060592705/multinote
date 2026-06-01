@@ -3,6 +3,9 @@
  *
  * 管理 ManualSignalingProvider 的生命周期，
  * 暴露创建/接受连接的方法和状态。
+ *
+ * 使用 docRef 避免 React 闭包中 doc 过时问题：
+ * setState 是异步的，click handler 调用时新 doc 可能还未渲染。
  */
 
 import { useRef, useState, useCallback, useEffect } from 'react'
@@ -32,6 +35,10 @@ export function useManualSync(
   doc: Y.Doc | null,
   roomKey: string,
 ): UseManualSyncReturn {
+  const docRef = useRef<Y.Doc | null>(doc)
+  // 始终保持 ref 与最新 doc 同步
+  docRef.current = doc
+
   const providerRef = useRef<ManualSignalingProvider | null>(null)
   const detachRef = useRef<(() => void) | null>(null)
   const [state, setState] = useState<ConnectionState>({
@@ -47,7 +54,9 @@ export function useManualSync(
     if (providerRef.current && !providerRef.current['_disposed']) {
       return providerRef.current
     }
-    if (!doc) throw new Error('文档未初始化')
+    // 通过 ref 读取 doc，避免闭包过时
+    const currentDoc = docRef.current
+    if (!currentDoc) throw new Error('文档未初始化')
 
     // 清理旧 provider
     if (detachRef.current) {
@@ -55,7 +64,7 @@ export function useManualSync(
       detachRef.current = null
     }
 
-    const provider = new ManualSignalingProvider(doc, roomKey)
+    const provider = new ManualSignalingProvider(currentDoc, roomKey)
     providerRef.current = provider
 
     // 监听状态变化
@@ -79,7 +88,7 @@ export function useManualSync(
     detachRef.current = attachDocSync(provider)
 
     return provider
-  }, [doc, roomKey])
+  }, [roomKey])
 
   /* ── 清理 ── */
   useEffect(() => {

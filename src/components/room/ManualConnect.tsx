@@ -66,23 +66,20 @@ export default function ManualConnect({ onConnected, onBack }: Props) {
   /* ── Yjs Doc & Provider ── */
   const [doc, setDoc] = useState<Y.Doc | null>(null)
 
-  // 只在实际需要连接时创建 doc 和 provider
+  // 只在需要时创建 provider（doc 为 null 时不创建）
   const sync = useManualSync(doc, roomKey)
 
-  /* ── 创建 Y.Doc ── */
-  useEffect(() => {
-    if (role) {
-      const d = new Y.Doc()
-      setDoc(d)
-      return () => { d.destroy() }
-    }
-  }, [role])
+  /* ── 创建 Y.Doc（同步创建，避免 setState 异步导致 provider 未就绪） ── */
+  function ensureDoc(): Y.Doc {
+    const d = new Y.Doc()
+    setDoc(d)
+    return d
+  }
 
   /* ── 监听连接状态 ── */
   useEffect(() => {
     if (sync.synced && doc) {
       setStep(role === 'offerer' ? 'offer-done' : 'answer-done')
-      // 延迟回调，让 UI 先显示"已连接"
       const t = setTimeout(() => onConnected(doc), 800)
       return () => clearTimeout(t)
     }
@@ -97,6 +94,9 @@ export default function ManualConnect({ onConnected, onBack }: Props) {
     setError('')
     setRole('offerer')
     setLoading(true)
+
+    // 先创建 Doc（通过 ref 同步可读，不依赖 React 重渲染）
+    ensureDoc()
 
     try {
       const sdp = await sync.createOffer()
