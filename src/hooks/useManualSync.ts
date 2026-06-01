@@ -57,11 +57,11 @@ export function useManualSync(
     const provider = new ManualSignalingProvider(currentDoc, roomKey)
     providerRef.current = provider
 
-    provider.on('state', ([s]: [ConnectionState]) => {
+    provider.on('state', (s: ConnectionState) => {
       setState({ ...s })
     })
 
-    provider.on('synced', ([data]: [{ synced: boolean }]) => {
+    provider.on('synced', (data: { synced: boolean }) => {
       setSynced(data.synced)
     })
 
