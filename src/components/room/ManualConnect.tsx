@@ -290,6 +290,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
       {/* 发起方：Offer 已生成 */}
       {step === 'offer-ready' && (
         <div className="space-y-4">
+          <RoomCodeBadge roomKey={roomKey} />
           <StepLabel num={1} text="复制这段连接码，微信发给对方" />
           <CopyBox text={localSdp} copied={copiedOffer} onCopy={() => setCopiedOffer(true)} />
 
@@ -322,6 +323,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
       {/* 接收方：粘贴 Offer */}
       {step === 'answer-input' && (
         <div className="space-y-4">
+          <RoomCodeBadge roomKey={roomKey} />
           <StepLabel num={1} text="粘贴对方发来的连接码" />
           <textarea
             value={remoteSdp}
@@ -348,6 +350,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
       {/* 接收方：Answer 已生成 */}
       {step === 'answer-ready' && (
         <div className="space-y-4">
+          <RoomCodeBadge roomKey={roomKey} />
           <StepLabel num={2} text="复制这段回传码，微信发给对方" />
           <CopyBox text={localSdp} copied={copiedAnswer} onCopy={() => setCopiedAnswer(true)} />
           <p className="text-xs text-[var(--text-tertiary)] text-center">
@@ -402,6 +405,18 @@ function CopyBox({ text, copied, onCopy }: { text: string; copied: boolean; onCo
         {copied ? <Check size={14} /> : <Copy size={14} />}
         <span>{copied ? '已复制' : '复制'}</span>
       </button>
+    </div>
+  )
+}
+
+function RoomCodeBadge({ roomKey }: { roomKey: string }) {
+  return (
+    <div className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
+                    bg-[var(--accent)]/10 border border-[var(--accent)]/30">
+      <span className="text-xs text-[var(--text-tertiary)]">房间码</span>
+      <span className="text-lg font-bold font-mono tracking-[0.2em] text-[var(--accent)]">
+        {roomKey}
+      </span>
     </div>
   )
 }

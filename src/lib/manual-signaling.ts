@@ -27,36 +27,102 @@ function generateConnectionId(): string {
 }
 
 /* ═══════════════════════════════════════════
-   SDP 序列化
+   SDP 序列化 & 压缩
    ═══════════════════════════════════════════ */
 
 interface PackedSdp {
   type: 'offer' | 'answer'
   sdp: string
   connId: string
-  /** 发起方标识：双方必须有相同的 roomKey 才能连接 */
   roomKey: string
 }
 
-/** 将 RTCSessionDescription 打包为可复制的文本 */
-function packSdp(
+/** SDP 瘦身：仅保留 data channel 相关行，去掉音视频 codec/RTP/RTCP 等冗余行 */
+function stripSdp(sdp: string): string {
+  const ignorePatterns = [
+    /^a=extmap:/,         // RTP 头部扩展
+    /^a=rtcp-fb:/,        // RTCP 反馈
+    /^a=rtpmap:/,         // RTP codec 映射
+    /^a=fmtp:/,           // 格式参数
+    /^a=rtcp-mux/,        // RTCP 复用
+    /^a=rtcp-rsize/,      // RTCP 缩小尺寸
+    /^a=ssrc:/,           // 同步源标识
+    /^a=ssrc-group:/,     // 同步源组
+    /^a=msid-semantic:/,  // 媒体流语义
+    /^a=max-message-size:/, // 最大消息尺寸（非关键）
+  ]
+  const lines = sdp.split('\r\n').filter((line) => {
+    const trimmed = line.trim()
+    if (!trimmed) return false
+    return !ignorePatterns.some((p) => p.test(trimmed))
+  })
+  return lines.join('\r\n') + '\r\n'
+}
+
+/** Uint8Array → base64（分块避免栈溢出） */
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const CHUNK = 4096
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.slice(i, i + CHUNK))
+  }
+  return btoa(binary)
+}
+
+/** base64 → Uint8Array */
+function base64ToUint8(base64: string): Uint8Array {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+/** 打包 + 压缩：SDP → 去冗余行 → JSON → gzip → base64（前缀 c! 标识压缩格式） */
+async function packSdpCompressed(
   desc: RTCSessionDescriptionInit,
   connId: string,
   roomKey: string,
-): string {
+): Promise<string> {
   const payload: PackedSdp = {
     type: desc.type as 'offer' | 'answer',
-    sdp: desc.sdp!,
+    sdp: stripSdp(desc.sdp!),
     connId,
     roomKey,
   }
-  return btoa(JSON.stringify(payload))
+  const json = JSON.stringify(payload)
+  const compressed = await new Response(
+    new Blob([json]).stream().pipeThrough(new CompressionStream('gzip')),
+  ).arrayBuffer()
+  return 'c!' + uint8ToBase64(new Uint8Array(compressed))
 }
 
-/** 从复制文本中解包 SDP */
-function unpackSdp(packed: string): PackedSdp | null {
+/**
+ * 解包（兼容新旧格式）
+ * - `c!` 前缀 → 压缩格式：base64 → gzip 解压 → JSON
+ * - 其他 → 旧格式（未压缩 base64 JSON）
+ */
+async function unpackSdp(packed: string): Promise<PackedSdp | null> {
+  const text = packed.trim()
+
+  // 压缩格式（c! 前缀）
+  if (text.startsWith('c!')) {
+    try {
+      const bytes = base64ToUint8(text.slice(2))
+      const decompressed = await new Response(
+        new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')),
+      ).text()
+      const obj = JSON.parse(decompressed)
+      if (!obj.type || !obj.sdp || !obj.connId || !obj.roomKey) return null
+      if (obj.type !== 'offer' && obj.type !== 'answer') return null
+      return obj as PackedSdp
+    } catch {
+      return null
+    }
+  }
+
+  // 兼容旧格式（未压缩 base64 JSON）
   try {
-    const obj = JSON.parse(atob(packed.trim()))
+    const obj = JSON.parse(atob(text))
     if (!obj.type || !obj.sdp || !obj.connId || !obj.roomKey) return null
     if (obj.type !== 'offer' && obj.type !== 'answer') return null
     return obj as PackedSdp
@@ -183,7 +249,7 @@ export class ManualSignalingProvider extends Observable<string> {
     if (this._creatingOffer) throw new Error('正在处理连接，请稍候...')
     this._creatingOffer = true
 
-    const unpacked = unpackSdp(packedSdp)
+    const unpacked = await unpackSdp(packedSdp)
     if (!unpacked) throw new Error('无效的连接码')
     if (unpacked.type !== 'offer') throw new Error('需要 offer 类型的连接码')
     if (unpacked.roomKey !== this.roomKey) throw new Error('房间码不匹配')
@@ -237,7 +303,7 @@ export class ManualSignalingProvider extends Observable<string> {
       )
     }
 
-    const unpacked = unpackSdp(packedSdp)
+    const unpacked = await unpackSdp(packedSdp)
     if (!unpacked) throw new Error('无效的连接码')
     if (unpacked.type !== 'answer') throw new Error('需要 answer 类型的连接码')
     if (unpacked.roomKey !== this.roomKey) throw new Error('房间码不匹配')
@@ -361,15 +427,20 @@ export class ManualSignalingProvider extends Observable<string> {
     this.dc.send(update.buffer)
   }
 
-  /** 等待 ICE 候选收集完成，返回包含完整候选的打包 SDP */
+  /** 等待 ICE 候选收集完成，返回压缩打包后的 SDP */
   private waitForIceComplete(pc: RTCPeerConnection): Promise<string> {
     return new Promise((resolve, reject) => {
-      const packNow = () => {
+      const packNow = async () => {
         if (!pc.localDescription || !pc.localDescription.sdp) {
           reject(new Error('本地 SDP 为空'))
           return
         }
-        resolve(packSdp(pc.localDescription, this.connId, this.roomKey))
+        try {
+          const packed = await packSdpCompressed(pc.localDescription, this.connId, this.roomKey)
+          resolve(packed)
+        } catch (err) {
+          reject(err)
+        }
       }
 
       // 某些浏览器同步完成 ICE 收集
