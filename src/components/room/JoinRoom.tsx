@@ -46,35 +46,33 @@ export default function JoinRoom({ onJoin, onBack, onLanConnect }: Props) {
           输入朋友分享的房间码即可加入
         </p>
 
-        {/* 输入框（在线模式时需要，LAN 模式时用作预设） */}
-        {mode === 'online' && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-              房间码
-            </label>
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => {
-                setCode(e.target.value.toUpperCase())
-                setError('')
-              }}
-              onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-              placeholder="输入房间码，如 ABC123"
-              maxLength={10}
-              autoFocus
-              className="w-full px-4 py-3 rounded-lg border border-[var(--border)]
-                         bg-[var(--bg-primary)] text-[var(--text-primary)]
-                         placeholder:text-[var(--text-tertiary)]
-                         focus:outline-none focus:ring-2 focus:ring-[var(--accent)]
-                         focus:border-transparent text-lg font-mono tracking-widest
-                         text-center transition-all"
-            />
-            {error && (
-              <p className="text-[var(--danger)] text-sm mt-2">{error}</p>
-            )}
-          </div>
-        )}
+        {/* 房间码输入（两种模式都需要） */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+            房间码
+          </label>
+          <input
+            type="text"
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value.toUpperCase())
+              setError('')
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && mode === 'online' && handleJoin()}
+            placeholder="输入房间码，如 ABC123"
+            maxLength={10}
+            autoFocus
+            className="w-full px-4 py-3 rounded-lg border border-[var(--border)]
+                       bg-[var(--bg-primary)] text-[var(--text-primary)]
+                       placeholder:text-[var(--text-tertiary)]
+                       focus:outline-none focus:ring-2 focus:ring-[var(--accent)]
+                       focus:border-transparent text-lg font-mono tracking-widest
+                       text-center transition-all"
+          />
+          {error && (
+            <p className="text-[var(--danger)] text-sm mt-2">{error}</p>
+          )}
+        </div>
 
         {/* 连接方式切换 */}
         <div className="flex mb-6 bg-[var(--bg-tertiary)] rounded-lg p-1">
