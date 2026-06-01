@@ -38,8 +38,10 @@ type Props = {
   onConnected: (doc: Y.Doc) => void
   /** 返回 */
   onBack: () => void
-  /** 预设房间码（从创建房间传入） */
+  /** 预设房间码 */
   presetKey?: string
+  /** 预选角色（跳过角色选择），'answerer' 会直接进入粘贴 offer 步骤 */
+  defaultRole?: 'offerer' | 'answerer'
 }
 
 /* ── 辅助 ── */
@@ -61,7 +63,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export default function ManualConnect({ onConnected, onBack, presetKey }: Props) {
+export default function ManualConnect({ onConnected, onBack, presetKey, defaultRole }: Props) {
   /* ── 状态 ── */
   const [roomKey, setRoomKey] = useState(presetKey || '')
   const [role, setRole] = useState<'offerer' | 'answerer' | null>(null)
@@ -95,6 +97,14 @@ export default function ManualConnect({ onConnected, onBack, presetKey }: Props)
       return () => clearTimeout(t)
     }
   }, [sync.synced, doc, role, onConnected])
+
+  /* ── defaultRole：预选角色 ── */
+  useEffect(() => {
+    if (defaultRole === 'answerer' && step === 'init' && roomKey.trim()) {
+      setRole('answerer')
+      setStep('answer-input')
+    }
+  }, [defaultRole, step, roomKey])
 
   /* ── 发起方：创建连接 ── */
   const handleCreate = useCallback(async () => {
@@ -224,7 +234,6 @@ export default function ManualConnect({ onConnected, onBack, presetKey }: Props)
               onChange={(e) => setRoomKey(e.target.value.toUpperCase())}
               placeholder={presetKey || "例如：COFFEE"}
               maxLength={10}
-              readOnly={!!presetKey}
               className="w-full px-4 py-2.5 text-center text-lg tracking-[0.3em] font-mono
                          bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg
                          text-[var(--text-primary)] placeholder-[var(--text-tertiary)]
@@ -237,27 +246,31 @@ export default function ManualConnect({ onConnected, onBack, presetKey }: Props)
           </div>
 
           <div className="flex gap-3">
-            <button
-              onClick={handleCreate}
-              disabled={!roomKey.trim()}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
-                         bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]
-                         disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-            >
-              <Link size={16} />
-              发起连接
-            </button>
-            <button
-              onClick={() => setStep('answer-input')}
-              disabled={!roomKey.trim()}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
-                         bg-[var(--bg-tertiary)] text-[var(--text-primary)]
-                         hover:bg-[var(--border)] disabled:opacity-40
-                         disabled:cursor-not-allowed transition-all"
-            >
-              <ArrowRightLeft size={16} />
-              接受连接
-            </button>
+            {defaultRole !== 'answerer' && (
+              <button
+                onClick={handleCreate}
+                disabled={!roomKey.trim()}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
+                           bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]
+                           disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                <Link size={16} />
+                发起连接
+              </button>
+            )}
+            {defaultRole !== 'offerer' && (
+              <button
+                onClick={() => setStep('answer-input')}
+                disabled={!roomKey.trim()}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
+                           bg-[var(--bg-tertiary)] text-[var(--text-primary)]
+                           hover:bg-[var(--border)] disabled:opacity-40
+                           disabled:cursor-not-allowed transition-all"
+              >
+                <ArrowRightLeft size={16} />
+                接受连接
+              </button>
+            )}
           </div>
         </div>
       )}
