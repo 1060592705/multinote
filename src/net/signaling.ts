@@ -111,6 +111,7 @@ export class ManualSignalingProvider extends Observable<string> {
   private dc: RTCDataChannel | null = null
   private _synced: boolean = false
   private _disposed: boolean = false
+  private _cachedOffer: RTCSessionDescriptionInit | null = null
 
   /** ICE 收集超时定时器 */
   private _iceTimer: ReturnType<typeof setTimeout> | null = null
@@ -155,9 +156,10 @@ export class ManualSignalingProvider extends Observable<string> {
       })
       this.setupDataChannel(this.dc)
 
-      // 创建 Offer
+      // 创建 Offer 并缓存，供 acceptAnswer 状态恢复
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
+      this._cachedOffer = { type: 'offer', sdp: offer.sdp! }
 
       // 等待 ICE 候选收集完成
       const packed = await this.waitForIceComplete(pc, 'offer')
@@ -229,6 +231,14 @@ export class ManualSignalingProvider extends Observable<string> {
     this.setState({ status: 'connecting' })
 
     try {
+      // 如果 PC 不在 have-local-offer 状态（如浏览器空闲回收了 offer），
+      // 用缓存的 offer 重建本地描述，再设置远程 answer
+      if (this.pc.signalingState !== 'have-local-offer') {
+        if (!this._cachedOffer) {
+          throw new Error('连接状态异常（无缓存 offer），请重新发起连接')
+        }
+        await this.pc.setLocalDescription(this._cachedOffer)
+      }
       await this.pc.setRemoteDescription(
         new RTCSessionDescription({ type: 'answer', sdp: unpacked.sdp }),
       )
