@@ -32,8 +32,11 @@ export function useYjsSync(roomCode: string, userId: string) {
 
     // 追踪 WebRTC 对等端连接数量（通过 'peers' 事件数据）
     const peerCountRef = { current: 0 }
-    const updatePeers = ({ webrtcPeers }: { webrtcPeers?: unknown[] }) => {
-      const count = Array.isArray(webrtcPeers) ? webrtcPeers.length : 0
+    const updatePeers = (event: unknown) => {
+      // y-webrtc 将数据包裹在数组中发出: emit('peers', [{ added, removed, webrtcPeers }])
+      const data = Array.isArray(event) ? event[0] as Record<string, unknown> | undefined : null
+      const peers = data?.webrtcPeers
+      const count = Array.isArray(peers) ? peers.length : 0
       peerCountRef.current = count
       useUIStore.getState().setConnectedPeers(count)
     }
