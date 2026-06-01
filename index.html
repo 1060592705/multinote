@@ -33,7 +33,13 @@
         var reason = event.reason;
         showErrorBox('unhandledrejection', reason && reason.message ? reason.message : String(reason), reason && reason.stack ? reason.stack : '');
       });
-      console.log('[debug] index.html error handlers installed');
+      console.log('[debug v2] index.html error handlers installed | build: 8fe7fc6');
+      // 版本标签（右下角）
+      var vBadge = document.createElement('div');
+      vBadge.id = 'version-badge';
+      vBadge.style.cssText = 'position:fixed;bottom:8px;right:12px;z-index:99998;background:rgba(0,0,0,.65);color:#aaa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:11px;pointer-events:none';
+      vBadge.textContent = 'debug-8fe7fc6';
+      document.body.appendChild(vBadge);
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
