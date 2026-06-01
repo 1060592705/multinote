@@ -317,9 +317,10 @@ export class ManualSignalingProvider extends Observable<string> {
 
     channel.onmessage = (event) => {
       // 接收 Yjs 更新
+      // origin=this → attachDocSync 过滤掉远程回传的更新，避免回声循环
       if (event.data instanceof ArrayBuffer) {
         const update = new Uint8Array(event.data)
-        Y.applyUpdate(this.doc, update)
+        Y.applyUpdate(this.doc, update, this)
       }
     }
 

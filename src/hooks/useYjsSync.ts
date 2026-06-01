@@ -138,6 +138,7 @@ export function useYjsSync(roomCode: string, userId: string) {
   /* ── 对方笔记本变化 ← Yjs ── */
   const setFriendNotebook = useNotebookStore((s) => s.setFriendNotebook)
   const setPeerStatus = useNotebookStore((s) => s.setPeerStatus)
+  const prevFriendRef = useRef('')
 
   useEffect(() => {
     const sync = syncRef.current
@@ -151,26 +152,32 @@ export function useYjsSync(roomCode: string, userId: string) {
 
         const data = readNotebookFromDoc(sync.doc, key)
         if (data) {
-          const friendNb: Notebook = {
-            id: `nb-${key}`,
-            name: data.name,
-            ownerId: key,
-            pages: data.pages.map((p) => ({
-              id: p.id,
-              pageNumber: p.pageNumber,
-              blocks: p.blocks,
-              doodleLayers: p.doodleLayers,
-              pageHandwriting: p.pageHandwriting || [],
-              thumbnail: p.thumbnail,
-              showDoodles: p.showDoodles,
-              createdAt: p.createdAt,
-              updatedAt: p.updatedAt,
-            })),
-            currentPageIndex: data.currentPageIndex,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
+          // 浅比较：只有好友数据实际变化时才更新 Zustand，避免自己的每次操作都触发对方面板重渲染
+          const snapshot = JSON.stringify(data)
+          if (snapshot !== prevFriendRef.current) {
+            prevFriendRef.current = snapshot
+
+            const friendNb: Notebook = {
+              id: `nb-${key}`,
+              name: data.name,
+              ownerId: key,
+              pages: data.pages.map((p) => ({
+                id: p.id,
+                pageNumber: p.pageNumber,
+                blocks: p.blocks,
+                doodleLayers: p.doodleLayers,
+                pageHandwriting: p.pageHandwriting || [],
+                thumbnail: p.thumbnail,
+                showDoodles: p.showDoodles,
+                createdAt: p.createdAt,
+                updatedAt: p.updatedAt,
+              })),
+              currentPageIndex: data.currentPageIndex,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            }
+            setFriendNotebook(friendNb)
           }
-          setFriendNotebook(friendNb)
         }
       })
     }

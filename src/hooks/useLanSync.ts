@@ -123,6 +123,7 @@ export function useLanSync(doc: Y.Doc, userId: string) {
 
   /* ── 对方笔记本 ← Y.Doc ── */
   const setFriendNotebook = useNotebookStore((s) => s.setFriendNotebook)
+  const prevFriendRef = useRef('')
 
   useEffect(() => {
     const sync = syncRef.current
@@ -136,30 +137,39 @@ export function useLanSync(doc: Y.Doc, userId: string) {
 
         const data = readNotebookFromDoc(sync.doc, key)
         if (data) {
-          const friendNb: Notebook = {
-            id: `nb-${key}`,
-            name: data.name,
-            ownerId: key,
-            pages: data.pages.map((p) => ({
-              id: p.id,
-              pageNumber: p.pageNumber,
-              blocks: p.blocks,
-              doodleLayers: p.doodleLayers,
-              pageHandwriting: p.pageHandwriting || [],
-              thumbnail: p.thumbnail,
-              showDoodles: p.showDoodles,
-              createdAt: p.createdAt,
-              updatedAt: p.updatedAt,
-            })),
-            currentPageIndex: data.currentPageIndex,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          }
-          setFriendNotebook(friendNb)
+          // 浅比较：只有好友数据实际变化时才更新 Zustand，避免自己的每次操作都触发对方面板重渲染
+          const snapshot = JSON.stringify(data)
+          if (snapshot !== prevFriendRef.current) {
+            prevFriendRef.current = snapshot
 
-          // 自动检测对方在线：一旦发现非本机的 notebook 就设置 peerStatus
+            const friendNb: Notebook = {
+              id: `nb-${key}`,
+              name: data.name,
+              ownerId: key,
+              pages: data.pages.map((p) => ({
+                id: p.id,
+                pageNumber: p.pageNumber,
+                blocks: p.blocks,
+                doodleLayers: p.doodleLayers,
+                pageHandwriting: p.pageHandwriting || [],
+                thumbnail: p.thumbnail,
+                showDoodles: p.showDoodles,
+                createdAt: p.createdAt,
+                updatedAt: p.updatedAt,
+              })),
+              currentPageIndex: data.currentPageIndex,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            }
+            setFriendNotebook(friendNb)
+          }
+
+          // 自动检测对方在线状态，好友切换页面时跟随更新
           const currentPeer = useNotebookStore.getState().peerStatus
-          if (!currentPeer || currentPeer.userId !== key) {
+          const needUpdate = !currentPeer ||
+            currentPeer.userId !== key ||
+            currentPeer.currentPageIndex !== data.currentPageIndex
+          if (needUpdate) {
             useNotebookStore.getState().setPeerStatus({
               userId: key,
               isOnline: true,
