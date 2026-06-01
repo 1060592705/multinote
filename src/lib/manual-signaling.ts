@@ -9,6 +9,7 @@
 
 import * as Y from 'yjs'
 import { Observable } from 'lib0/observable'
+import { ICE_SERVERS } from './constants'
 
 /* ═══════════════════════════════════════════
    常量
@@ -259,7 +260,6 @@ export class ManualSignalingProvider extends Observable<string> {
     }
 
     this.setState({ status: 'disconnected', localSdp: null })
-    this.destroy()
     super.destroy?.()
   }
 
@@ -267,19 +267,19 @@ export class ManualSignalingProvider extends Observable<string> {
      内部方法
      ═══════════════════════════════════════════ */
 
-  /** 创建 RTCPeerConnection（纯局域网，无 STUN/TURN） */
+  /** 创建 RTCPeerConnection */
   private createPeerConnection(): RTCPeerConnection {
     if (this.pc) {
       this.pc.close()
     }
 
     this.pc = new RTCPeerConnection({
-      // 不配置 iceServers —— 纯局域网 mDNS 直连，不依赖任何外部服务器
-      iceServers: [],
+      // STUN 辅助 NAT 穿透和本地 IP 发现（同 WiFi 下仍走 mDNS 直连）
+      iceServers: ICE_SERVERS,
     })
 
     this.pc.onconnectionstatechange = () => {
-      if (!this.pc) return
+      if (this._disposed || !this.pc) return
       const state = this.pc.connectionState
       if (state === 'connected') {
         this.setState({ status: 'connected' })
@@ -316,10 +316,11 @@ export class ManualSignalingProvider extends Observable<string> {
     }
 
     channel.onmessage = (event) => {
-      // 接收 Yjs 更新
+      if (this._disposed) return
+      // 接收 Yjs 更新（传入 this 作为 origin，防止回声循环）
       if (event.data instanceof ArrayBuffer) {
         const update = new Uint8Array(event.data)
-        Y.applyUpdate(this.doc, update)
+        Y.applyUpdate(this.doc, update, this)
       }
     }
 
@@ -330,6 +331,7 @@ export class ManualSignalingProvider extends Observable<string> {
 
   /** 同步步骤1：发送完整文档状态 */
   private syncStep1(): void {
+    if (this._disposed) return
     if (!this.dc || this.dc.readyState !== 'open') return
     const stateUpdate = Y.encodeStateAsUpdate(this.doc)
     this.dc.send(stateUpdate.buffer)
@@ -337,16 +339,23 @@ export class ManualSignalingProvider extends Observable<string> {
 
   /** 同步步骤2：发送增量更新（在 doc.on('update') 中触发） */
   private syncStep2(update: Uint8Array, _origin: unknown): void {
+    if (this._disposed) return
     if (!this.dc || this.dc.readyState !== 'open') return
-    // 不发送本地产生的更新回自己（避免循环）
-    // y-webrtc 通过 origin 参数区分本地/远程更新
     this.dc.send(update.buffer)
   }
 
   /** 等待 ICE 候选收集完成 */
   private waitForIceComplete(pc: RTCPeerConnection, _type: 'offer' | 'answer'): Promise<string> {
     return new Promise((resolve, reject) => {
+      const clearIceTimer = () => {
+        if (this._iceTimer) {
+          clearTimeout(this._iceTimer)
+          this._iceTimer = null
+        }
+      }
+
       const pack = () => {
+        clearIceTimer()
         if (!pc.localDescription || !pc.localDescription.sdp) {
           reject(new Error('本地 SDP 为空'))
           return

@@ -23,6 +23,7 @@ export type RoomState = {
 interface LanState {
   doc: Y.Doc
   userId: string
+  roomKey: string
 }
 
 export default function App() {
@@ -51,8 +52,8 @@ export default function App() {
   }, [])
 
   /** 局域网直连回调 */
-  const handleLanConnect = (doc: Y.Doc, userId: string) => {
-    setLan({ doc, userId })
+  const handleLanConnect = (doc: Y.Doc, userId: string, roomKey: string) => {
+    setLan({ doc, userId, roomKey })
   }
 
   if (!room && !lan) {
@@ -77,7 +78,7 @@ function RoomApp({ room }: { room: NonNullable<RoomState> }) {
 function LanRoomApp({ lan }: { lan: LanState }) {
   const userIdRef = useRef(lan.userId)
   userIdRef.current = lan.userId
-  useLanSync(lan.doc, lan.userId, null)
+  useLanSync(lan.doc, lan.userId)
   useAutoSave(lan.userId)
   return <RoomUI />
 }

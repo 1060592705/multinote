@@ -39,7 +39,7 @@ export default function PageCanvas({
 
   const updateBlock = useNotebookStore((s) => s.updateBlock)
   const removeBlock = useNotebookStore((s) => s.removeBlock)
-  const addBlock = useNotebookStore((s) => s.addBlock)
+  const insertBlockAfter = useNotebookStore((s) => s.insertBlockAfter)
   const editMode = useToolStore((s) => s.editMode)
 
   // 绘图模式：涂鸦模式（朋友面板）或自己面板的 draw 模式
@@ -103,10 +103,10 @@ export default function PageCanvas({
   )
 
   const handleAddBlockAfter = useCallback(
-    (_afterBlockId: string, block: Block) => {
-      addBlock(pageIndex, block)
+    (afterBlockId: string, block: Block) => {
+      insertBlockAfter(pageIndex, afterBlockId, block)
     },
-    [pageIndex, addBlock],
+    [pageIndex, insertBlockAfter],
   )
 
   /* ── 内容判定 ── */

@@ -18,11 +18,7 @@ import type { YjsSync } from '../lib/yjs'
 import type { Notebook, DoodleLayer } from '../types'
 import { CONNECTION_TIMEOUT } from '../lib/constants'
 
-/** 读取 y-webrtc provider 内部 peer 数量（API 未公开暴露，通过内部字段读取） */
-function getPeerCount(sync: YjsSync): number {
-  const peers = (sync.provider as unknown as { peers?: Map<string, unknown> }).peers
-  return peers ? peers.size : 0
-}
+/** 跟踪 peer 数量（通过 'peers' 事件更新，避免访问 y-webrtc 内部 API） */
 
 export function useYjsSync(roomCode: string, userId: string) {
   const syncRef = useRef<YjsSync | null>(null)
@@ -34,19 +30,19 @@ export function useYjsSync(roomCode: string, userId: string) {
     setGlobalSync(sync)
     ensureNotebookInDoc(sync.doc, userId, '我的笔记本')
 
-    // 追踪 WebRTC 对等端连接
-    const updatePeers = () => {
-      useUIStore.getState().setConnectedPeers(getPeerCount(sync))
+    // 追踪 WebRTC 对等端连接数量（通过 'peers' 事件数据）
+    const peerCountRef = { current: 0 }
+    const updatePeers = ({ webrtcPeers }: { webrtcPeers?: unknown[] }) => {
+      const count = Array.isArray(webrtcPeers) ? webrtcPeers.length : 0
+      peerCountRef.current = count
+      useUIStore.getState().setConnectedPeers(count)
     }
 
     sync.provider.on('peers', updatePeers)
 
-    // 初始检测
-    updatePeers()
-
     // 超时检测：30 秒后若还没有对等端
     const timeout = setTimeout(() => {
-      if (getPeerCount(sync) === 0) {
+      if (peerCountRef.current === 0) {
         useUIStore.getState().setPeerConnecting(false)
       }
     }, CONNECTION_TIMEOUT)

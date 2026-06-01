@@ -42,6 +42,7 @@ interface NotebookState {
   goToMyPage: (pageIndex: number) => void
   addMyPage: () => string
   addBlock: (pageIndex: number, block: Block) => void
+  insertBlockAfter: (pageIndex: number, afterBlockId: string, block: Block) => void
   updateBlock: (pageIndex: number, blockId: string, updater: (block: Block) => Block) => void
   removeBlock: (pageIndex: number, blockId: string) => void
   addStroke: (pageIndex: number, blockId: string, stroke: HandwritingData[number]) => void
@@ -197,6 +198,31 @@ export const useNotebookStore = create<NotebookState>((set, get) => {
           updatedAt: Date.now(),
         },
       })),
+
+    insertBlockAfter: (pageIndex, afterBlockId, block) =>
+      set((s) => {
+        const page = s.myNotebook.pages[pageIndex]
+        const afterIdx = page.blocks.findIndex((b) => b.id === afterBlockId)
+        const insertIdx = afterIdx >= 0 ? afterIdx + 1 : page.blocks.length
+        const newBlocks = [...page.blocks]
+        newBlocks.splice(insertIdx, 0, { ...block, position: insertIdx })
+        // 重排后续块的位置
+        for (let i = insertIdx + 1; i < newBlocks.length; i++) {
+          newBlocks[i] = { ...newBlocks[i], position: i }
+        }
+        return {
+          ...pushHistory(s),
+          myNotebook: {
+            ...s.myNotebook,
+            pages: updatePage(s.myNotebook.pages, pageIndex, () => ({
+              ...page,
+              blocks: newBlocks,
+              updatedAt: Date.now(),
+            })),
+            updatedAt: Date.now(),
+          },
+        }
+      }),
 
     updateBlock: (pageIndex, blockId, updater) =>
       set((s) => ({
