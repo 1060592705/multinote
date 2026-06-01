@@ -18,6 +18,7 @@ import {
   ManualSignalingProvider,
   attachDocSync,
   type ConnectionState,
+  type IceStats,
 } from '../lib/manual-signaling'
 
 /* ── 模块级：LAN 连接建立后，provider 存活供 useLanSync 接管 ── */
@@ -39,6 +40,7 @@ export function clearLanProvider(): void {
 export interface UseManualSyncReturn {
   state: ConnectionState
   synced: boolean
+  lastIceStats: IceStats | null
   createOffer: () => Promise<string>
   acceptOffer: (sdpText: string) => Promise<string>
   acceptAnswer: (sdpText: string) => Promise<void>
@@ -56,9 +58,11 @@ export function useManualSync(
     role: null,
     localSdp: null,
     error: null,
+    iceStats: null,
   })
   const [synced, setSynced] = useState(false)
   const syncedRef = useRef(false)
+  const [lastIceStats, setLastIceStats] = useState<IceStats | null>(null)
 
   /* ── 同步 synced → ref（cleanup 闭包安全读取） ── */
   useEffect(() => {
@@ -96,6 +100,11 @@ export function useManualSync(
 
     provider.on('disconnect', () => {
       setSynced(false)
+    })
+
+    provider.on('connection-failed', (stats?: IceStats) => {
+      setSynced(false)
+      if (stats) setLastIceStats(stats)
     })
 
     detachRef.current = attachDocSync(provider)
@@ -162,6 +171,7 @@ export function useManualSync(
   return {
     state,
     synced,
+    lastIceStats,
     createOffer,
     acceptOffer,
     acceptAnswer,

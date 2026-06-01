@@ -7,8 +7,9 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import * as Y from 'yjs'
-import { Copy, Check, Link, Loader2, Wifi, ArrowRightLeft, AlertCircle, ArrowLeft } from 'lucide-react'
+import { Copy, Check, Link, Loader2, Wifi, ArrowRightLeft, AlertCircle, ArrowLeft, Signal } from 'lucide-react'
 import { useManualSync } from '../../hooks/useManualSync'
+import type { IceStats } from '../../lib/manual-signaling'
 
 /* ── 步骤枚举 ── */
 
@@ -53,6 +54,26 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
+/** 根据 ICE 统计生成有帮助的连接失败信息 */
+function buildDisconnectMessage(stats: IceStats | null): string {
+  if (!stats || stats.candidates === 0) {
+    return '连接已断开。未收集到任何网络候选，请检查浏览器是否允许局域网访问，或尝试切换 WiFi。'
+  }
+  const parts: string[] = []
+  parts.push(`连接已断开。已收集 ${stats.candidates} 个网络候选`)
+  if (stats.host > 0) parts.push(`${stats.host} 个本地`)
+  if (stats.srflx > 0) parts.push(`${stats.srflx} 个公网`)
+  if (stats.relay > 0) parts.push(`${stats.relay} 个中继`)
+
+  let msg = parts.join('，')
+  if (stats.srflx === 0) {
+    msg += '。仅获取到本地候选，请确认两台设备在同一 WiFi 下。'
+  } else if (stats.host > 0 && stats.srflx > 0) {
+    msg += '。候选充足但连接失败，可能路由器开启了 AP 隔离（客户端隔离），请尝试关闭该功能。'
+  }
+  return msg
+}
+
 export default function ManualConnect({ onConnected, onBack, presetKey, defaultRole }: Props) {
   /* ── 状态 ── */
   const [roomKey, setRoomKey] = useState(presetKey || '')
@@ -72,6 +93,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
   const docRef = useRef<Y.Doc | null>(null)
   const [doc, setDoc] = useState<Y.Doc | null>(null)
   const sync = useManualSync(docRef, roomKey)
+  const { lastIceStats } = sync
 
   /** 同步创建 Doc：直接写 ref.current + setState（触发重渲染） */
   function ensureDoc(): Y.Doc {
@@ -94,9 +116,10 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
   /* ── 监听连接失败 ── */
   useEffect(() => {
     if (sync.state.status === 'disconnected' && step !== 'init' && step !== 'error') {
-      setError('连接已断开。请确认两台设备在同一个 WiFi 下，且没有防火墙阻止直连。')
+      const stats = sync.state.iceStats || lastIceStats
+      setError(buildDisconnectMessage(stats))
     }
-  }, [sync.state.status, step])
+  }, [sync.state.status, step, sync.state.iceStats, lastIceStats])
 
   /* ── defaultRole：预选角色 ── */
   useEffect(() => {
@@ -135,7 +158,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
     }
   }, [roomKey, sync, loading])
 
-  /* ── 恢复：连接状态异常时重新生成 offer ── */
+  /* ── 重新发起连接（根据角色分别处理） ── */
   const handleRetry = useCallback(async () => {
     if (loading || lockRef.current) return
     lockRef.current = true
@@ -143,17 +166,25 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
     setLoading(true)
 
     try {
-      const sdp = await sync.createOffer()
-      setLocalSdp(sdp)
-      setRemoteSdp('') // 清空旧 answer
-      setStep('offer-ready')
+      if (role === 'offerer') {
+        const sdp = await sync.createOffer()
+        setLocalSdp(sdp)
+        setRemoteSdp('')
+        setStep('offer-ready')
+      } else {
+        // answerer：回到粘贴 offer 步骤，等待对方重新发起
+        setRemoteSdp('')
+        setLocalSdp('')
+        setStep('answer-input')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '重新发起失败')
+      setStep('error')
     } finally {
       setLoading(false)
       lockRef.current = false
     }
-  }, [sync, loading])
+  }, [sync, loading, role])
 
   /* ── 发起方：粘贴 answer 完成连接 ── */
   const handleAcceptAnswer = useCallback(async () => {
@@ -246,12 +277,16 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
       {/* 错误提示 */}
       {error && (
         <div className="space-y-2">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm">
-            <AlertCircle size={16} />
-            <span>{error}</span>
+          <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm">
+            <AlertCircle size={16} className="shrink-0 mt-0.5" />
+            <span className="leading-relaxed">{error}</span>
           </div>
-          {/* 连接状态异常时可一键重新发起 */}
-          {error.includes('连接状态异常') && (
+          {/* ICE 诊断（有统计信息时展示） */}
+          {sync.state.iceStats && sync.state.iceStats.candidates > 0 && (
+            <IceDiagnostics stats={sync.state.iceStats} />
+          )}
+          {/* 连接失败时可一键重新发起 */}
+          {(error.includes('连接状态异常') || error.includes('连接已断开')) && (
             <button
               type="button"
               onClick={handleRetry}
@@ -452,6 +487,42 @@ function RoomCodeBadge({ roomKey }: { roomKey: string }) {
       <span className="text-lg font-bold font-mono tracking-[0.2em] text-[var(--accent)]">
         {roomKey}
       </span>
+    </div>
+  )
+}
+
+function IceDiagnostics({ stats }: { stats: IceStats }) {
+  if (stats.candidates === 0) {
+    return (
+      <div className="px-3 py-2 rounded-lg bg-amber-50 text-amber-700 text-xs space-y-1">
+        <p className="font-medium">未收集到网络候选</p>
+        <p>可能原因：浏览器禁止了局域网访问、设备未连接 WiFi、或防火墙拦截。</p>
+      </div>
+    )
+  }
+  return (
+    <div className="px-3 py-2 rounded-lg bg-gray-50 text-[var(--text-secondary)] text-xs space-y-1">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Signal size={12} />
+        <span className="font-medium">网络候选: {stats.candidates}</span>
+        {stats.host > 0 && (
+          <span className="px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+            {stats.host} 本地
+          </span>
+        )}
+        {stats.srflx > 0 && (
+          <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+            {stats.srflx} 公网
+          </span>
+        )}
+        {stats.relay > 0 && (
+          <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+            {stats.relay} 中继
+          </span>
+        )}
+        {stats.gatheringComplete && <span className="text-[var(--text-tertiary)]">✓ 收集完成</span>}
+      </div>
+      <p className="text-[var(--text-tertiary)]">耗时 {stats.durationMs}ms</p>
     </div>
   )
 }

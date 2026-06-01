@@ -9,13 +9,14 @@
 
 import * as Y from 'yjs'
 import { Observable } from 'lib0/observable'
+import { ICE_SERVERS } from './constants'
 
 /* ═══════════════════════════════════════════
    常量
    ═══════════════════════════════════════════ */
 
 /** 等待 ICE 候选收集完成的最大时间（ms） */
-const ICE_GATHER_TIMEOUT = 5000
+const ICE_GATHER_TIMEOUT = 8000
 
 /* ═══════════════════════════════════════════
    连接 ID 生成
@@ -139,11 +140,22 @@ async function unpackSdp(packed: string): Promise<PackedSdp | null> {
 
 export type ConnectionRole = 'offerer' | 'answerer' | null
 
+/** ICE 候选收集诊断信息 */
+export interface IceStats {
+  candidates: number
+  host: number
+  srflx: number
+  relay: number
+  gatheringComplete: boolean
+  durationMs: number
+}
+
 export interface ConnectionState {
   status: 'idle' | 'gathering' | 'ready' | 'connecting' | 'connected' | 'disconnected' | 'error'
   role: ConnectionRole
   localSdp: string | null       // 打包后的本地 SDP，供复制
   error: string | null
+  iceStats: IceStats | null     // ICE 候选收集诊断
 }
 
 /**
@@ -167,6 +179,7 @@ export class ManualSignalingProvider extends Observable<string> {
     role: null,
     localSdp: null,
     error: null,
+    iceStats: null,
   }
 
   get state(): Readonly<ConnectionState> {
@@ -181,6 +194,10 @@ export class ManualSignalingProvider extends Observable<string> {
   private _creatingOffer: boolean = false
   private _providerId: number
   private _offerSeq: number = 0
+
+  /** ICE 收集诊断 */
+  private _iceCandidates: { type: string; address: string }[] = []
+  private _iceStartTime: number = 0
 
   /** ICE 收集超时定时器 */
   private _iceTimer: ReturnType<typeof setTimeout> | null = null
@@ -365,36 +382,84 @@ export class ManualSignalingProvider extends Observable<string> {
      内部方法
      ═══════════════════════════════════════════ */
 
-  /** 创建 RTCPeerConnection（纯局域网，无 STUN/TURN） */
+  /** 创建 RTCPeerConnection，配置 STUN 服务器辅助 NAT 穿透 */
   private createPeerConnection(): RTCPeerConnection {
+    // 清理旧连接
     if (this.pc) {
       this.pc.close()
+      this.pc = null
+    }
+    // 清理旧的 ICE 定时器（重试场景）
+    if (this._iceTimer) {
+      clearTimeout(this._iceTimer)
+      this._iceTimer = null
     }
 
+    // 重置 ICE 诊断
+    this._iceCandidates = []
+    this._iceStartTime = Date.now()
+
     this.pc = new RTCPeerConnection({
-      // 不配置 iceServers —— 纯局域网 mDNS 直连，不依赖任何外部服务器
-      iceServers: [],
+      iceServers: ICE_SERVERS,
     })
+
+    // 收集 ICE 候选诊断信息
+    this.pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        const candidate = event.candidate
+        this._iceCandidates.push({
+          type: candidate.type || 'unknown',
+          address: candidate.address || '(hidden)',
+        })
+        // 实时更新 ICE 统计
+        this.setState({ iceStats: this._buildIceStats() })
+      }
+    }
+
+    this.pc.oniceconnectionstatechange = () => {
+      if (!this.pc) return
+      const iceState = this.pc.iceConnectionState
+      if (iceState === 'checking' || iceState === 'connected' || iceState === 'completed') {
+        // ICE 有进展，更新统计
+        this.setState({ iceStats: this._buildIceStats() })
+      }
+    }
 
     this.pc.onconnectionstatechange = () => {
       if (!this.pc) return
       const state = this.pc.connectionState
       if (state === 'connected') {
-        this.setState({ status: 'connected' })
+        this.setState({ status: 'connected', iceStats: this._buildIceStats() })
         this.emit('connect', [])
       } else if (state === 'disconnected' || state === 'failed') {
-        console.warn(`[MS] Connection ${state} | ice=${this.pc?.iceConnectionState}`)
-        this.setState({ status: 'disconnected' })
+        const iceStats = this._buildIceStats()
+        console.warn(`[MS] Connection ${state} | ice=${this.pc?.iceConnectionState} | candidates=${iceStats.host}h/${iceStats.srflx}s/${iceStats.relay}r`)
+        this.setState({ status: 'disconnected', iceStats })
         this._synced = false
         this.emit('disconnect', [])
-        // 连接彻底失败时发出专门事件，方便 UI 展示帮助信息
+        // 连接彻底失败时发出专门事件，携带诊断信息
         if (state === 'failed') {
-          this.emit('connection-failed', [])
+          this.emit('connection-failed', [iceStats])
         }
       }
     }
 
     return this.pc
+  }
+
+  /** 构建当前 ICE 统计 */
+  private _buildIceStats(): IceStats {
+    const host = this._iceCandidates.filter((c) => c.type === 'host').length
+    const srflx = this._iceCandidates.filter((c) => c.type === 'srflx').length
+    const relay = this._iceCandidates.filter((c) => c.type === 'relay').length
+    return {
+      candidates: this._iceCandidates.length,
+      host,
+      srflx,
+      relay,
+      gatheringComplete: this.pc?.iceGatheringState === 'complete',
+      durationMs: Date.now() - this._iceStartTime,
+    }
   }
 
   /** 设置数据通道的事件处理 */
