@@ -99,6 +99,7 @@ function RoomUI({ roomCode }: { roomCode: string }) {
   return (
     <div className="h-full w-full flex flex-col bg-[var(--bg-secondary)]">
       <Toolbar
+        roomCode={roomCode}
         scale={scale}
         userZoom={userZoom}
         onResetZoom={resetZoom}
