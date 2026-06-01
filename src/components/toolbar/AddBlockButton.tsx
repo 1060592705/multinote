@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import type { BlockType } from '../../lib/constants'
 import type { Block } from '../../types'
+import { createEmptyBlock } from '../canvas/blockUtils'
 
 type Props = {
   onAddBlock: (block: Block) => void
@@ -20,41 +21,11 @@ const MENU_ITEMS: { type: BlockType; label: string; icon: string }[] = [
   { type: 'image', label: '图片', icon: '🖼' },
 ]
 
-function createBlock(type: BlockType, position: number): Block {
-  const base = {
-    id: `block-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    type,
-    handwriting: null,
-    position,
-    style: {},
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  }
-
-  switch (type) {
-    case 'paragraph':
-      return { ...base, content: { type: 'paragraph' as const, text: '' } }
-    case 'h1':
-      return { ...base, content: { type: 'heading' as const, level: 1, text: '' } }
-    case 'h2':
-      return { ...base, content: { type: 'heading' as const, level: 2, text: '' } }
-    case 'h3':
-      return { ...base, content: { type: 'heading' as const, level: 3, text: '' } }
-    case 'todo':
-      return { ...base, content: { type: 'todo' as const, text: '', checked: false } }
-    case 'image':
-      return { ...base, content: { type: 'image' as const, src: '', alt: '', width: 0, height: 0 } }
-    default:
-      return { ...base, content: { type: 'paragraph' as const, text: '' } }
-  }
-}
-
 export default function AddBlockButton({ onAddBlock }: Props) {
   const [open, setOpen] = useState(false)
   const [btnRect, setBtnRect] = useState<DOMRect | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
-  // 点击外部关闭
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
@@ -68,8 +39,7 @@ export default function AddBlockButton({ onAddBlock }: Props) {
   }, [open])
 
   const handleSelect = (type: BlockType) => {
-    const block = createBlock(type, 0)
-    onAddBlock(block)
+    onAddBlock(createEmptyBlock(type))
     setOpen(false)
     setBtnRect(null)
   }

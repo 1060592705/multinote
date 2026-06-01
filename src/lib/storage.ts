@@ -11,14 +11,11 @@ import type { Notebook } from '../types'
 
 class MultiNoteDB extends Dexie {
   notebooks!: Table<{ id: string; data: Notebook; updatedAt: number }>
-  settings!: Table<{ key: string; value: unknown }>
 
   constructor() {
     super('multinote')
-
     this.version(1).stores({
       notebooks: '&id, updatedAt',
-      settings: '&key',
     })
   }
 }
@@ -40,33 +37,4 @@ export async function saveNotebook(notebook: Notebook): Promise<void> {
 export async function loadNotebook(id: string): Promise<Notebook | null> {
   const entry = await db.notebooks.get(id)
   return entry?.data ?? null
-}
-
-/** 删除本地笔记本 */
-export async function deleteNotebook(id: string): Promise<void> {
-  await db.notebooks.delete(id)
-}
-
-/** 获取所有本地笔记本的 ID 列表 */
-export async function listNotebookIds(): Promise<string[]> {
-  const all = await db.notebooks.toArray()
-  return all.map((n) => n.id)
-}
-
-/* ── 设置存储 ── */
-
-/** 保存应用设置 */
-export async function saveSetting(key: string, value: unknown): Promise<void> {
-  await db.settings.put({ key, value })
-}
-
-/** 读取应用设置 */
-export async function loadSetting<T>(key: string): Promise<T | null> {
-  const entry = await db.settings.get(key)
-  return (entry?.value as T) ?? null
-}
-
-/** 删除设置 */
-export async function deleteSetting(key: string): Promise<void> {
-  await db.settings.delete(key)
 }

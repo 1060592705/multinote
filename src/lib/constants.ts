@@ -48,10 +48,6 @@ export const BLOCK_TYPES = [
   'h3',
   'todo',
   'image',
-  'quote',
-  'divider',
-  'table',
-  'drawing',
 ] as const
 export type BlockType = typeof BLOCK_TYPES[number]
 

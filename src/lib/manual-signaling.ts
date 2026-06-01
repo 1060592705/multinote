@@ -9,6 +9,7 @@
 
 import * as Y from 'yjs'
 import { Observable } from 'lib0/observable'
+import { packSdp, unpackSdp } from './sdp-codec'
 
 /* ═══════════════════════════════════════════
    常量
@@ -29,111 +30,6 @@ function generateConnectionId(): string {
 }
 
 let _providerIdCounter = 0
-
-/* ═══════════════════════════════════════════
-   SDP 序列化 & 压缩
-   ═══════════════════════════════════════════ */
-
-interface PackedSdp {
-  type: 'offer' | 'answer'
-  sdp: string
-  connId: string
-  roomKey: string
-}
-
-/** SDP 瘦身：仅保留 data channel 相关行，去掉音视频 codec/RTP/RTCP 等冗余行 */
-function stripSdp(sdp: string): string {
-  const ignorePatterns = [
-    /^a=extmap:/,         // RTP 头部扩展
-    /^a=rtcp-fb:/,        // RTCP 反馈
-    /^a=rtpmap:/,         // RTP codec 映射
-    /^a=fmtp:/,           // 格式参数
-    /^a=rtcp-mux/,        // RTCP 复用
-    /^a=rtcp-rsize/,      // RTCP 缩小尺寸
-    /^a=ssrc:/,           // 同步源标识
-    /^a=ssrc-group:/,     // 同步源组
-    /^a=msid-semantic:/,  // 媒体流语义
-    /^a=max-message-size:/, // 最大消息尺寸（非关键）
-  ]
-  const lines = sdp.split('\r\n').filter((line) => {
-    const trimmed = line.trim()
-    if (!trimmed) return false
-    return !ignorePatterns.some((p) => p.test(trimmed))
-  })
-  return lines.join('\r\n') + '\r\n'
-}
-
-/** Uint8Array → base64（分块避免栈溢出） */
-function uint8ToBase64(bytes: Uint8Array): string {
-  let binary = ''
-  const CHUNK = 4096
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.slice(i, i + CHUNK))
-  }
-  return btoa(binary)
-}
-
-/** base64 → Uint8Array */
-function base64ToUint8(base64: string): Uint8Array {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return bytes
-}
-
-/** 打包 + 压缩：SDP → 去冗余行 → JSON → gzip → base64（前缀 c! 标识压缩格式） */
-async function packSdpCompressed(
-  desc: RTCSessionDescriptionInit,
-  connId: string,
-  roomKey: string,
-): Promise<string> {
-  const payload: PackedSdp = {
-    type: desc.type as 'offer' | 'answer',
-    sdp: stripSdp(desc.sdp!),
-    connId,
-    roomKey,
-  }
-  const json = JSON.stringify(payload)
-  const compressed = await new Response(
-    new Blob([json]).stream().pipeThrough(new CompressionStream('gzip')),
-  ).arrayBuffer()
-  return 'c!' + uint8ToBase64(new Uint8Array(compressed))
-}
-
-/**
- * 解包（兼容新旧格式）
- * - `c!` 前缀 → 压缩格式：base64 → gzip 解压 → JSON
- * - 其他 → 旧格式（未压缩 base64 JSON）
- */
-async function unpackSdp(packed: string): Promise<PackedSdp | null> {
-  const text = packed.trim()
-
-  // 压缩格式（c! 前缀）
-  if (text.startsWith('c!')) {
-    try {
-      const bytes = base64ToUint8(text.slice(2))
-      const decompressed = await new Response(
-        new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')),
-      ).text()
-      const obj = JSON.parse(decompressed)
-      if (!obj.type || !obj.sdp || !obj.connId || !obj.roomKey) return null
-      if (obj.type !== 'offer' && obj.type !== 'answer') return null
-      return obj as PackedSdp
-    } catch {
-      return null
-    }
-  }
-
-  // 兼容旧格式（未压缩 base64 JSON）
-  try {
-    const obj = JSON.parse(atob(text))
-    if (!obj.type || !obj.sdp || !obj.connId || !obj.roomKey) return null
-    if (obj.type !== 'offer' && obj.type !== 'answer') return null
-    return obj as PackedSdp
-  } catch {
-    return null
-  }
-}
 
 /* ═══════════════════════════════════════════
    ManualSignalingProvider
@@ -538,7 +434,7 @@ export class ManualSignalingProvider extends Observable<string> {
           return
         }
         try {
-          const packed = await packSdpCompressed(pc.localDescription, this.connId, this.roomKey)
+          const packed = await packSdp(pc.localDescription, this.connId, this.roomKey)
           resolve(packed)
         } catch (err) {
           reject(err)

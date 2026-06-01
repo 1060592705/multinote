@@ -8,8 +8,9 @@
 import { useState } from 'react'
 import * as Y from 'yjs'
 import { ArrowLeft, Copy, Check, Wifi, Globe, RefreshCw } from 'lucide-react'
-import type { RoomState } from '../../App'
+import type { RoomState } from '../../types'
 import { generateRoomCode, generateUserId } from '../../lib/room'
+import { copyToClipboard } from '../../lib/clipboard'
 import ManualConnect from './ManualConnect'
 
 /* ── 类型 ── */
@@ -21,24 +22,6 @@ type Step = 'choose-mode' | 'room-entry' | 'lan-connect'
 type Props = {
   onJoin: (room: RoomState) => void
   onLanConnect: (doc: Y.Doc, userId: string, roomKey: string) => void
-}
-
-/* ── 辅助 ── */
-
-async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    const ta = document.createElement('textarea')
-    ta.value = text
-    ta.style.position = 'fixed'; ta.style.left = '-9999px'
-    document.body.appendChild(ta)
-    ta.select()
-    const ok = document.execCommand('copy')
-    document.body.removeChild(ta)
-    return ok
-  }
 }
 
 /* ═══════════════════════════════════════════

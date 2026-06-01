@@ -56,10 +56,6 @@ export type BlockContent =
   | HeadingContent
   | TodoContent
   | ImageContent
-  | QuoteContent
-  | DividerContent
-  | TableContent
-  | DrawingContent
 
 export interface ParagraphContent {
   type: 'paragraph'
@@ -84,28 +80,6 @@ export interface ImageContent {
   alt: string
   width: number
   height: number
-}
-
-export interface QuoteContent {
-  type: 'quote'
-  text: string
-}
-
-export interface DividerContent {
-  type: 'divider'
-}
-
-export interface TableContent {
-  type: 'table'
-  rows: number
-  cols: number
-  cells: string[][]      // 二维数组，cells[row][col]
-  columnWidths: number[]  // 每列宽度
-}
-
-export interface DrawingContent {
-  type: 'drawing'
-  strokes: HandwritingData
 }
 
 export interface BlockStyle {
@@ -164,6 +138,18 @@ export interface DoodleLayer {
 }
 
 /* ═══════════════════════════════════════════
+   房间
+   ═══════════════════════════════════════════ */
+
+export interface RoomConfig {
+  roomCode: string
+  userId: string
+  isHost: boolean
+}
+
+export type RoomState = RoomConfig | null
+
+/* ═══════════════════════════════════════════
    协作
    ═══════════════════════════════════════════ */
 
@@ -174,28 +160,4 @@ export interface PeerStatus {
   currentPageIndex: number
   /** 对方当前模式：浏览 or 涂鸦 */
   mode: 'browse' | 'doodle'
-}
-
-/* ═══════════════════════════════════════════
-   工具状态
-   ═══════════════════════════════════════════ */
-
-export interface ToolState {
-  activeBrush: BrushType
-  color: string
-  size: number
-  /** 涂鸦模式（仅在查看朋友页面时有效） */
-  isDoodleMode: boolean
-}
-
-/* ═══════════════════════════════════════════
-   历史记录
-   ═══════════════════════════════════════════ */
-
-export interface HistoryEntry {
-  /** 操作描述 */
-  description: string
-  /** 用于撤销的数据（快照） */
-  snapshot: string
-  timestamp: number
 }

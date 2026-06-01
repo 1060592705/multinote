@@ -10,6 +10,7 @@ import * as Y from 'yjs'
 import { Copy, Check, Link, Loader2, Wifi, ArrowRightLeft, AlertCircle, ArrowLeft, Signal } from 'lucide-react'
 import { useManualSync } from '../../hooks/useManualSync'
 import type { IceStats } from '../../lib/manual-signaling'
+import { copyToClipboard } from '../../lib/clipboard'
 
 /* ── 步骤枚举 ── */
 
@@ -36,23 +37,6 @@ type Props = {
 }
 
 /* ── 辅助 ── */
-
-async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    const ta = document.createElement('textarea')
-    ta.value = text
-    ta.style.position = 'fixed'
-    ta.style.left = '-9999px'
-    document.body.appendChild(ta)
-    ta.select()
-    const ok = document.execCommand('copy')
-    document.body.removeChild(ta)
-    return ok
-  }
-}
 
 /** 根据 ICE 统计生成有帮助的连接失败信息 */
 function buildDisconnectMessage(stats: IceStats | null): string {

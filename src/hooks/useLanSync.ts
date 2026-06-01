@@ -1,28 +1,18 @@
 /**
- * useLanSync — 局域网模式下的 Y.Doc ↔ Zustand 同步 Hook
+ * useLanSync — 局域网模式 Y.Doc ↔ Zustand 同步 Hook
  *
- * 与 useYjsSync 的区别：
- *   - 不创建 WebrtcProvider（数据通道由 ManualSignalingProvider 管理）
- *   - 仅负责 Y.Doc 与 Zustand stores 之间的双向桥接
- *   - 对方状态始终为"在线"（局域网直连，连接即在线）
- *   - 连接建立后从 useManualSync 接管 ManualSignalingProvider，
- *     通过 attachDocSync 将 doc 变更发送到 WebRTC DataChannel。
+ * 从 useManualSync 接管 ManualSignalingProvider（WebRTC DataChannel），
+ * 数据同步委托给 useYjsDataBridge 共享逻辑。
  */
 
 import { useEffect, useRef } from 'react'
 import * as Y from 'yjs'
 import { useNotebookStore } from '../store/useNotebookStore'
-import {
-  readNotebookFromDoc,
-  ensureNotebookInDoc,
-  setGlobalSync,
-} from '../lib/yjs'
+import { ensureNotebookInDoc, setGlobalSync } from '../lib/yjs'
 import type { YjsSync } from '../lib/yjs'
-import type { Notebook, DoodleLayer } from '../types'
 import { getLanProvider, clearLanProvider } from './useManualSync'
 import { attachDocSync } from '../lib/manual-signaling'
-
-/* ── 创建 YjsSync ── */
+import { useYjsDataBridge } from './useYjsDataBridge'
 
 function createLocalSync(doc: Y.Doc): YjsSync {
   return {
@@ -54,8 +44,6 @@ export function useLanSync(doc: Y.Doc, userId: string) {
     let sync: YjsSync
 
     if (lanProv && lanProv.doc === doc) {
-      // 接管 ManualSignalingProvider：重新挂载 doc → DataChannel 桥接
-      // （useManualSync 卸载时已 detach 旧 handler，这里重新挂载）
       const detach = attachDocSync(lanProv)
       detachRef.current = detach
 
@@ -80,9 +68,7 @@ export function useLanSync(doc: Y.Doc, userId: string) {
           clearLanProvider()
         },
       }
-      console.log('[useLanSync] Using live ManualSignalingProvider for sync')
     } else {
-      // fallback：无 LAN provider（理论不应发生）
       sync = createLocalSync(doc)
     }
 
@@ -93,198 +79,11 @@ export function useLanSync(doc: Y.Doc, userId: string) {
     return () => {
       setGlobalSync(null)
       syncRef.current = null
-      // 注意：不在这里 destroy lanProv，让连接保持到标签页关闭
     }
   }, [doc, userId])
 
-  /* ── 我的笔记本 → Y.Doc ── */
-  const myNotebook = useNotebookStore((s) => s.myNotebook)
-  const prevMyNotebookRef = useRef<string>('')
-
-  useEffect(() => {
-    const sync = syncRef.current
-    if (!sync) return
-
-    const json = JSON.stringify(myNotebook)
-    if (json === prevMyNotebookRef.current) return
-    prevMyNotebookRef.current = json
-
-    const notebooks = sync.doc.getMap('notebooks')
-    let nbMap = notebooks.get(userId) as Y.Map<unknown> | undefined
-    if (!nbMap) {
-      nbMap = new Y.Map<unknown>()
-      notebooks.set(userId, nbMap)
-    }
-
-    nbMap.set('name', myNotebook.name)
-    nbMap.set('currentPageIndex', myNotebook.currentPageIndex)
-
-    let pages = nbMap.get('pages') as Y.Array<Y.Map<unknown>> | undefined
-    if (!pages) {
-      pages = new Y.Array<Y.Map<unknown>>()
-      nbMap.set('pages', pages)
-    }
-
-    myNotebook.pages.forEach((page, idx) => {
-      while (pages!.length <= idx) {
-        const newPageMap = new Y.Map<unknown>()
-        newPageMap.set('doodleLayers', new Y.Array<Y.Map<unknown>>())
-        pages!.push([newPageMap])
-      }
-      const pm = pages!.get(idx)
-      pm.set('id', page.id)
-      pm.set('pageNumber', page.pageNumber)
-      pm.set('showDoodles', page.showDoodles)
-      pm.set('createdAt', page.createdAt)
-      pm.set('updatedAt', Date.now())
-      pm.set('thumbnail', page.thumbnail)
-
-      const blocks = new Y.Array<Y.Map<unknown>>()
-      blocks.push(page.blocks.map((b) => {
-        const bm = new Y.Map<unknown>()
-        bm.set('id', b.id); bm.set('type', b.type)
-        bm.set('content', b.content); bm.set('handwriting', b.handwriting)
-        bm.set('position', b.position); bm.set('style', b.style)
-        bm.set('createdAt', b.createdAt); bm.set('updatedAt', b.updatedAt)
-        return bm
-      }))
-      pm.set('blocks', blocks)
-
-      const phw = new Y.Array<Y.Map<unknown>>()
-      phw.push(page.pageHandwriting.map((s) => {
-        const sm = new Y.Map<unknown>()
-        sm.set('id', s.id); sm.set('points', s.points)
-        sm.set('brush', s.brush); sm.set('color', s.color)
-        sm.set('size', s.size); sm.set('timestamp', s.timestamp)
-        sm.set('authorId', s.authorId)
-        return sm
-      }))
-      pm.set('pageHandwriting', phw)
-    })
-  }, [myNotebook, userId])
-
-  /* ── 对方笔记本 ← Y.Doc ── */
-  const setFriendNotebook = useNotebookStore((s) => s.setFriendNotebook)
-  const prevFriendRef = useRef('')
-
-  useEffect(() => {
-    const sync = syncRef.current
-    if (!sync) return
-
-    const notebooks = sync.doc.getMap('notebooks')
-
-    const handler = () => {
-      notebooks.forEach((_nbMap, key) => {
-        if (key === userId) return
-
-        const data = readNotebookFromDoc(sync.doc, key)
-        if (data) {
-          // 浅比较：只有好友数据实际变化时才更新 Zustand，避免自己的每次操作都触发对方面板重渲染
-          const snapshot = JSON.stringify(data)
-          if (snapshot !== prevFriendRef.current) {
-            prevFriendRef.current = snapshot
-
-            const friendNb: Notebook = {
-              id: `nb-${key}`,
-              name: data.name,
-              ownerId: key,
-              pages: data.pages.map((p) => ({
-                id: p.id,
-                pageNumber: p.pageNumber,
-                blocks: p.blocks,
-                doodleLayers: p.doodleLayers,
-                pageHandwriting: p.pageHandwriting || [],
-                thumbnail: p.thumbnail,
-                showDoodles: p.showDoodles,
-                createdAt: p.createdAt,
-                updatedAt: p.updatedAt,
-              })),
-              currentPageIndex: data.currentPageIndex,
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            }
-            setFriendNotebook(friendNb)
-          }
-
-          // 自动检测对方在线状态，好友切换页面时跟随更新
-          const currentPeer = useNotebookStore.getState().peerStatus
-          const needUpdate = !currentPeer ||
-            currentPeer.userId !== key ||
-            currentPeer.currentPageIndex !== data.currentPageIndex
-          if (needUpdate) {
-            useNotebookStore.getState().setPeerStatus({
-              userId: key,
-              isOnline: true,
-              currentPageIndex: data.currentPageIndex,
-              mode: 'browse',
-            })
-          }
-        }
-      })
-    }
-
-    notebooks.observeDeep(handler)
-    handler()
-
-    return () => {
-      notebooks.unobserveDeep(handler)
-    }
-  }, [userId, setFriendNotebook])
-
-  /* ── 朋友涂鸦 ← Y.Doc ── */
-  useEffect(() => {
-    const sync = syncRef.current
-    if (!sync) return
-
-    const notebooks = sync.doc.getMap('notebooks')
-
-    const handler = () => {
-      const nbMap = notebooks.get(userId) as Y.Map<unknown> | undefined
-      if (!nbMap) return
-
-      const pages = nbMap.get('pages') as Y.Array<Y.Map<unknown>> | undefined
-      if (!pages) return
-
-      const state = useNotebookStore.getState()
-      const myPages = state.myNotebook.pages
-
-      let changed = false
-      const newPages = myPages.map((page, idx) => {
-        if (idx >= pages.length) return page
-        const yPage = pages.get(idx)
-        const yDoodles = yPage.get('doodleLayers') as Y.Array<Y.Map<unknown>> | undefined
-        if (!yDoodles) return page
-
-        const doodleLayers: DoodleLayer[] = yDoodles.toArray().map((dm) => ({
-          id: (dm.get('id') as string) || '',
-          pageId: (dm.get('pageId') as string) || '',
-          blockId: (dm.get('blockId') as string) || null,
-          authorId: (dm.get('authorId') as string) || '',
-          strokes: (dm.get('strokes') as DoodleLayer['strokes']) || [],
-          createdAt: (dm.get('createdAt') as number) || Date.now(),
-          updatedAt: (dm.get('updatedAt') as number) || Date.now(),
-        }))
-
-        if (doodleLayers.length !== page.doodleLayers.length) {
-          changed = true
-          return { ...page, doodleLayers }
-        }
-        return page
-      })
-
-      if (changed) {
-        useNotebookStore.setState({
-          myNotebook: { ...state.myNotebook, pages: newPages }
-        })
-      }
-    }
-
-    notebooks.observeDeep(handler)
-
-    return () => {
-      notebooks.unobserveDeep(handler)
-    }
-  }, [userId])
+  /* ── 数据桥接（共享逻辑） ── */
+  useYjsDataBridge(syncRef, userId)
 
   /* ── 定期更新当前页码 ── */
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import * as Y from 'yjs'
+import type { Doc } from 'yjs'
 import RoomGate from './components/room/RoomGate'
 import Sidebar from './components/layout/Sidebar'
 import Toolbar from './components/layout/Toolbar'
@@ -12,16 +12,11 @@ import { useLanSync } from './hooks/useLanSync'
 import { useAutoSave } from './hooks/useAutoSave'
 import { useCanvasScale } from './hooks/useCanvasScale'
 import { getRoomFromURL, generateUserId } from './lib/room'
-
-export type RoomState = {
-  roomCode: string
-  userId: string
-  isHost: boolean
-} | null
+import type { RoomState } from './types'
 
 /** 局域网直连状态 */
 interface LanState {
-  doc: Y.Doc
+  doc: Doc
   userId: string
 }
 
@@ -51,7 +46,7 @@ export default function App() {
   }, [])
 
   /** 局域网直连回调 */
-  const handleLanConnect = (doc: Y.Doc, userId: string, _roomKey: string) => {
+  const handleLanConnect = (doc: Doc, userId: string, _roomKey: string) => {
     setLan({ doc, userId })
   }
 

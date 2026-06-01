@@ -111,57 +111,6 @@ export function ensureNotebookInDoc(doc: Y.Doc, userId: string, name: string): v
   notebooks.set(userId, nbMap)
 }
 
-/** 向指定用户的指定页面添加块 */
-export function addBlockToDoc(doc: Y.Doc, userId: string, pageIndex: number, block: Block): void {
-  const pageMap = getPageMap(doc, userId, pageIndex)
-  if (!pageMap) return
-
-  const blocks = pageMap.get('blocks') as Y.Array<Y.Map<unknown>>
-  if (!blocks) return
-
-  blocks.push([blockToYMap(block)])
-  pageMap.set('updatedAt', Date.now())
-}
-
-/** 更新指定用户的指定页面的块 */
-export function updateBlockInDoc(doc: Y.Doc, userId: string, pageIndex: number, blockId: string, updater: (b: Block) => Block): void {
-  const pageMap = getPageMap(doc, userId, pageIndex)
-  if (!pageMap) return
-
-  const blocks = pageMap.get('blocks') as Y.Array<Y.Map<unknown>>
-  if (!blocks) return
-
-  for (let i = 0; i < blocks.length; i++) {
-    const bm = blocks.get(i)
-    if (bm.get('id') === blockId) {
-      const block = readBlock(bm)
-      const updated = updater(block)
-      const newBm = blockToYMap(updated)
-      blocks.delete(i, 1)
-      blocks.insert(i, [newBm])
-      break
-    }
-  }
-  pageMap.set('updatedAt', Date.now())
-}
-
-/** 从指定用户的指定页面删除块 */
-export function removeBlockFromDoc(doc: Y.Doc, userId: string, pageIndex: number, blockId: string): void {
-  const pageMap = getPageMap(doc, userId, pageIndex)
-  if (!pageMap) return
-
-  const blocks = pageMap.get('blocks') as Y.Array<Y.Map<unknown>>
-  if (!blocks) return
-
-  for (let i = 0; i < blocks.length; i++) {
-    if (blocks.get(i).get('id') === blockId) {
-      blocks.delete(i, 1)
-      break
-    }
-  }
-  pageMap.set('updatedAt', Date.now())
-}
-
 /** 添加涂鸦到朋友的页面上 */
 export function addDoodleToDoc(doc: Y.Doc, targetUserId: string, pageIndex: number, doodle: DoodleLayer): void {
   const pageMap = getPageMap(doc, targetUserId, pageIndex)
@@ -169,34 +118,12 @@ export function addDoodleToDoc(doc: Y.Doc, targetUserId: string, pageIndex: numb
 
   let doodles = pageMap.get('doodleLayers') as Y.Array<Y.Map<unknown>> | undefined
   if (!doodles) {
-    // 页面尚未有 doodleLayers，创建一个
     doodles = new Y.Array<Y.Map<unknown>>()
     pageMap.set('doodleLayers', doodles)
   }
 
   doodles.push([doodleToYMap(doodle)])
   pageMap.set('updatedAt', Date.now())
-}
-
-/** 设置用户当前页码 */
-export function setCurrentPageInDoc(doc: Y.Doc, userId: string, pageIndex: number): void {
-  const notebooks = doc.getMap('notebooks')
-  const nbMap = notebooks.get(userId) as Y.Map<unknown> | undefined
-  if (nbMap) {
-    nbMap.set('currentPageIndex', pageIndex)
-  }
-}
-
-/** 添加新页面 */
-export function addPageToDoc(doc: Y.Doc, userId: string, page: PageData): void {
-  const notebooks = doc.getMap('notebooks')
-  const nbMap = notebooks.get(userId) as Y.Map<unknown> | undefined
-  if (!nbMap) return
-
-  const pages = nbMap.get('pages') as Y.Array<Y.Map<unknown>>
-  if (!pages) return
-
-  pages.push([pageToYMap(page)])
 }
 
 /* ═══════════════════════════════════════════
@@ -320,30 +247,6 @@ export function initYjsSync(roomCode: string, userId: string): YjsSync {
   }
 
   return { doc, provider, destroy }
-}
-
-/** 观察 Y.Doc 中指定用户笔记本的变化 */
-export function observeNotebook(
-  doc: Y.Doc,
-  userId: string,
-  callback: (data: NotebookData | null) => void,
-): () => void {
-  const notebooks = doc.getMap('notebooks')
-
-  const handler = () => {
-    const data = readNotebookFromDoc(doc, userId)
-    callback(data)
-  }
-
-  // 观察整个 notebooks Map
-  notebooks.observeDeep(handler)
-
-  // 立即触发一次
-  handler()
-
-  return () => {
-    notebooks.unobserveDeep(handler)
-  }
 }
 
 /* ═══════════════════════════════════════════
