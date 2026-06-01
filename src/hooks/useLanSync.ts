@@ -5,6 +5,8 @@
  *   - 不创建 WebrtcProvider（数据通道由 ManualSignalingProvider 管理）
  *   - 仅负责 Y.Doc 与 Zustand stores 之间的双向桥接
  *   - 对方状态始终为"在线"（局域网直连，连接即在线）
+ *   - 连接建立后从 useManualSync 接管 ManualSignalingProvider，
+ *     通过 attachDocSync 将 doc 变更发送到 WebRTC DataChannel。
  */
 
 import { useEffect, useRef } from 'react'
@@ -17,8 +19,11 @@ import {
 } from '../lib/yjs'
 import type { YjsSync } from '../lib/yjs'
 import type { Notebook, DoodleLayer } from '../types'
+import { getLanProvider, clearLanProvider } from './useManualSync'
+import { attachDocSync } from '../lib/manual-signaling'
 
-/* ── 轻量 YjsSync（无 WebRTC） ── */
+/* ── 创建 YjsSync ── */
+
 function createLocalSync(doc: Y.Doc): YjsSync {
   return {
     doc,
@@ -41,10 +46,46 @@ function createLocalSync(doc: Y.Doc): YjsSync {
 
 export function useLanSync(doc: Y.Doc, userId: string) {
   const syncRef = useRef<YjsSync | null>(null)
+  const detachRef = useRef<(() => void) | null>(null)
 
   /* ── 初始化 ── */
   useEffect(() => {
-    const sync = createLocalSync(doc)
+    const lanProv = getLanProvider()
+    let sync: YjsSync
+
+    if (lanProv && lanProv.doc === doc) {
+      // 接管 ManualSignalingProvider：重新挂载 doc → DataChannel 桥接
+      // （useManualSync 卸载时已 detach 旧 handler，这里重新挂载）
+      const detach = attachDocSync(lanProv)
+      detachRef.current = detach
+
+      sync = {
+        doc,
+        provider: {
+          awareness: {
+            setLocalState: () => {},
+            getStates: () => new Map(),
+            on: () => {},
+            off: () => {},
+            clientID: 0,
+            setLocalStateField: () => {},
+          },
+          on: () => {},
+          off: () => {},
+          disconnect: () => lanProv.destroy(),
+        } as unknown as YjsSync['provider'],
+        destroy: () => {
+          detach()
+          lanProv.destroy()
+          clearLanProvider()
+        },
+      }
+      console.log('[useLanSync] Using live ManualSignalingProvider for sync')
+    } else {
+      // fallback：无 LAN provider（理论不应发生）
+      sync = createLocalSync(doc)
+    }
+
     syncRef.current = sync
     setGlobalSync(sync)
     ensureNotebookInDoc(sync.doc, userId, '我的笔记本')
@@ -52,6 +93,7 @@ export function useLanSync(doc: Y.Doc, userId: string) {
     return () => {
       setGlobalSync(null)
       syncRef.current = null
+      // 注意：不在这里 destroy lanProv，让连接保持到标签页关闭
     }
   }, [doc, userId])
 

@@ -108,6 +108,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
 
   /* ── 发起方：创建连接 ── */
   const handleCreate = useCallback(async () => {
+    if (loading) return
     if (!roomKey.trim()) {
       setError('请先输入房间码')
       return
@@ -129,10 +130,11 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
     } finally {
       setLoading(false)
     }
-  }, [roomKey, sync])
+  }, [roomKey, sync, loading])
 
   /* ── 发起方：粘贴 answer 完成连接 ── */
   const handleAcceptAnswer = useCallback(async () => {
+    if (loading) return
     if (!remoteSdp.trim()) {
       setError('请先粘贴对方回传的连接码')
       return
@@ -149,10 +151,11 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
     } finally {
       setLoading(false)
     }
-  }, [remoteSdp, sync])
+  }, [remoteSdp, sync, loading])
 
   /* ── 接收方：粘贴 offer → 生成 answer ── */
   const handleAcceptOffer = useCallback(async () => {
+    if (loading) return
     if (!remoteSdp.trim()) {
       setError('请先粘贴对方的连接码')
       return
@@ -178,7 +181,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
     } finally {
       setLoading(false)
     }
-  }, [remoteSdp, roomKey, sync])
+  }, [remoteSdp, roomKey, sync, loading])
 
   /* ── 渲染 ── */
 
@@ -249,7 +252,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
             {defaultRole !== 'answerer' && (
               <button
                 onClick={handleCreate}
-                disabled={!roomKey.trim()}
+                disabled={!roomKey.trim() || loading}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
                            bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]
                            disabled:opacity-40 disabled:cursor-not-allowed transition-all"
@@ -261,7 +264,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
             {defaultRole !== 'offerer' && (
               <button
                 onClick={() => setStep('answer-input')}
-                disabled={!roomKey.trim()}
+                disabled={!roomKey.trim() || loading}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
                            bg-[var(--bg-tertiary)] text-[var(--text-primary)]
                            hover:bg-[var(--border)] disabled:opacity-40
@@ -294,7 +297,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
 
           <button
             onClick={handleAcceptAnswer}
-            disabled={!remoteSdp.trim()}
+            disabled={!remoteSdp.trim() || loading}
             className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white
                        hover:bg-[var(--accent-hover)] disabled:opacity-40
                        disabled:cursor-not-allowed transition-all"
@@ -323,7 +326,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
 
           <button
             onClick={handleAcceptOffer}
-            disabled={!remoteSdp.trim()}
+            disabled={!remoteSdp.trim() || loading}
             className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white
                        hover:bg-[var(--accent-hover)] disabled:opacity-40
                        disabled:cursor-not-allowed transition-all"

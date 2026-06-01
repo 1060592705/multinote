@@ -7,6 +7,9 @@
  * 使用 MutableRefObject<Y.Doc | null> 而非 Y.Doc | null：
  * 避免 React 闭包中 doc 过时 —— 调用方可以直接写 ref.current，
  * 不依赖 React 重渲染，确保 provider 创建时一定能读到 doc。
+ *
+ * ⚠️ 生命周期：连接建立后（synced=true），provider 不会随组件卸载而销毁，
+ *    而是转移到模块级变量 _lanProvider，供 useLanSync 接管。
  */
 
 import { useRef, useState, useCallback, useEffect, type MutableRefObject } from 'react'
@@ -16,6 +19,22 @@ import {
   attachDocSync,
   type ConnectionState,
 } from '../lib/manual-signaling'
+
+/* ── 模块级：LAN 连接建立后，provider 存活供 useLanSync 接管 ── */
+let _lanProvider: ManualSignalingProvider | null = null
+
+/** 获取当前存活的 LAN provider（供 useLanSync 使用） */
+export function getLanProvider(): ManualSignalingProvider | null {
+  if (_lanProvider && !(_lanProvider as any)['_disposed']) {
+    return _lanProvider
+  }
+  return null
+}
+
+/** 清除模块级 LAN provider 引用（useLanSync destroy 时调用） */
+export function clearLanProvider(): void {
+  _lanProvider = null
+}
 
 export interface UseManualSyncReturn {
   state: ConnectionState
@@ -39,10 +58,16 @@ export function useManualSync(
     error: null,
   })
   const [synced, setSynced] = useState(false)
+  const syncedRef = useRef(false)
+
+  /* ── 同步 synced → ref（cleanup 闭包安全读取） ── */
+  useEffect(() => {
+    syncedRef.current = synced
+  }, [synced])
 
   /* ── 创建/重建 Provider ── */
   const ensureProvider = useCallback(() => {
-    if (providerRef.current && !providerRef.current['_disposed']) {
+    if (providerRef.current && !(providerRef.current as any)['_disposed']) {
       return providerRef.current
     }
     // 直接从 ref 读 doc —— 调用方可以同步设置 ref.current，不依赖 React 重渲染
@@ -78,16 +103,33 @@ export function useManualSync(
     return provider
   }, [docRef, roomKey])
 
-  /* ── 清理 ── */
+  /* ── 清理 ──
+     关键：如果连接已建立（synced），不销毁 provider，
+     转移到模块级变量 _lanProvider 让 useLanSync 接管。
+     旧 doc→DC 桥接先 detach，useLanSync 会重新 attachDocSync。
+     否则 WebRTC DataChannel 随组件卸载而关闭，导致两个标签页各自独立。 */
   useEffect(() => {
     return () => {
-      if (detachRef.current) {
-        detachRef.current()
-        detachRef.current = null
-      }
-      if (providerRef.current) {
-        providerRef.current.destroy()
-        providerRef.current = null
+      if (syncedRef.current && providerRef.current) {
+        // 连接已建立 → detach 旧 handler，provider 存活转移给 useLanSync
+        if (detachRef.current) {
+          detachRef.current()
+          detachRef.current = null
+        }
+        _lanProvider = providerRef.current
+        console.log('[useManualSync] Provider transferred to useLanSync (synced=true)')
+      } else {
+        // 未连接 → 正常清理
+        if (detachRef.current) {
+          detachRef.current()
+          detachRef.current = null
+        }
+        if (providerRef.current) {
+          providerRef.current.destroy()
+          providerRef.current = null
+        }
+        // 同时清理模块级（如果有）
+        _lanProvider = null
       }
     }
   }, [])
