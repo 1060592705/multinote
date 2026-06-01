@@ -17,29 +17,22 @@
         if (old) old.remove();
         var box = document.createElement('div');
         box.id = 'global-error-box';
-        box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;padding:16px 20px;font-family:monospace;font-size:13px;line-height:1.6;white-space:pre-wrap;max-height:50vh;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+        box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;padding:12px 20px;font-family:monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;max-height:40vh;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.3);cursor:pointer';
         box.textContent = '[' + source + '] ' + msg + '\n\n' + (stack || '(no stack)');
+        box.title = '点击关闭';
+        box.onclick = function() { box.remove(); };
         document.body.appendChild(box);
         window.__caughtErrors.push({source:source, msg:msg, stack:stack, time:new Date().toISOString()});
       }
-      // window.onerror 捕获同步错误
       window.onerror = function(msg, file, line, col, error) {
         var stack = (error && error.stack) || ('at ' + file + ':' + line + ':' + col);
         showErrorBox('window.onerror', String(msg), stack);
-        return false; // 允许浏览器也记录
+        return false;
       };
-      // unhandledrejection 捕获 Promise 错误
       window.addEventListener('unhandledrejection', function(event) {
         var reason = event.reason;
         showErrorBox('unhandledrejection', reason && reason.message ? reason.message : String(reason), reason && reason.stack ? reason.stack : '');
       });
-      console.log('[debug v6] index.html error handlers installed | build: 582b5e3');
-      // 版本标签（底部醒目横条）
-      var vBadge = document.createElement('div');
-      vBadge.id = 'version-badge';
-      vBadge.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99998;background:#A78BFA;color:#fff;padding:6px 16px;font-family:monospace;font-size:13px;text-align:center;font-weight:bold;letter-spacing:0.1em';
-      vBadge.textContent = '🔗 MultiNote | debug-582b5e3 | 2026-06-01';
-      document.body.appendChild(vBadge);
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>

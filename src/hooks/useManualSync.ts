@@ -70,7 +70,6 @@ export function useManualSync(
     if (providerRef.current && !(providerRef.current as any)['_disposed']) {
       return providerRef.current
     }
-    console.log('[useManualSync] ensureProvider: creating new provider (prev was null or disposed)')
     // 直接从 ref 读 doc —— 调用方可以同步设置 ref.current，不依赖 React 重渲染
     const currentDoc = docRef.current
     if (!currentDoc) throw new Error('文档未初始化')
@@ -118,7 +117,6 @@ export function useManualSync(
           detachRef.current = null
         }
         _lanProvider = providerRef.current
-        console.log('[useManualSync] Provider transferred to useLanSync (synced=true)')
       } else {
         // 未连接 → 正常清理
         if (detachRef.current) {

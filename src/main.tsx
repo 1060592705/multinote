@@ -3,8 +3,6 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 
-console.log('[debug v2] main.tsx loaded, deploying global error fallback')
-
 // ═══════════════════════════════════════════
 // WebSocket 信令服务器连接过滤
 //

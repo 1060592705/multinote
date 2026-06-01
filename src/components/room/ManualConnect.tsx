@@ -5,20 +5,10 @@
  * 同 WiFi 下 mDNS 局域网直连，零外部服务器。
  */
 
-import { useState, useCallback, useEffect, useRef, Component, type ReactNode } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import * as Y from 'yjs'
 import { Copy, Check, Link, Loader2, Wifi, ArrowRightLeft, AlertCircle, ArrowLeft } from 'lucide-react'
 import { useManualSync } from '../../hooks/useManualSync'
-
-/* ── 调试用 — 定位后删除 ── */
-class EB extends Component<{ children: ReactNode; name: string }, { err: Error | null }> {
-  constructor(props: { children: ReactNode; name: string }) { super(props); this.state = { err: null } }
-  static getDerivedStateFromError(err: Error) { return { err } }
-  render() {
-    if (this.state.err) return <div className="p-3 rounded bg-red-600 text-white text-xs font-mono whitespace-pre-wrap">[{this.props.name}]\n{this.state.err.message}\n\n{this.state.err.stack?.split('\n').slice(0,10).join('\n')}</div>
-    return this.props.children
-  }
-}
 
 /* ── 步骤枚举 ── */
 
@@ -100,6 +90,13 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
       return () => clearTimeout(t)
     }
   }, [sync.synced, doc, role, onConnected])
+
+  /* ── 监听连接失败 ── */
+  useEffect(() => {
+    if (sync.state.status === 'disconnected' && step !== 'init' && step !== 'error') {
+      setError('连接已断开。请确认两台设备在同一个 WiFi 下，且没有防火墙阻止直连。')
+    }
+  }, [sync.state.status, step])
 
   /* ── defaultRole：预选角色 ── */
   useEffect(() => {
@@ -220,19 +217,16 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
 
   if (loading) {
     return (
-      <EB name="ManualConnect(loading)">
         <div className="flex flex-col items-center justify-center gap-4 py-12">
           <Loader2 size={32} className="animate-spin text-[var(--accent)]" />
           <p className="text-sm text-[var(--text-secondary)]">
             {role === 'offerer' ? '正在建立连接...' : '正在处理...'}
           </p>
         </div>
-      </EB>
     )
   }
 
   return (
-    <EB name="ManualConnect(main)">
     <div className="space-y-5">
       {/* 返回按钮 */}
       <button onClick={onBack} className="btn-icon">
@@ -404,7 +398,6 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
       {/* 接收方：连接完成 */}
       {step === 'answer-done' && <ConnectedMessage />}
     </div>
-  </EB>
   )
 }
 

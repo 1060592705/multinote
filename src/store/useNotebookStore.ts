@@ -41,6 +41,7 @@ interface NotebookState {
   setMyNotebook: (nb: Notebook) => void
   goToMyPage: (pageIndex: number) => void
   addMyPage: () => string
+  removeMyPage: (pageIndex: number) => void
   addBlock: (pageIndex: number, block: Block) => void
   updateBlock: (pageIndex: number, blockId: string, updater: (block: Block) => Block) => void
   removeBlock: (pageIndex: number, blockId: string) => void
@@ -182,6 +183,20 @@ export const useNotebookStore = create<NotebookState>((set, get) => {
         },
       }))
       return newPage.id
+    },
+
+    removeMyPage: (pageIndex) => {
+      const state = get()
+      if (state.myNotebook.pages.length <= 1) return // 至少保留一页
+      set((s) => ({
+        ...pushHistory(s),
+        myNotebook: {
+          ...s.myNotebook,
+          pages: s.myNotebook.pages.filter((_, i) => i !== pageIndex),
+          currentPageIndex: Math.min(s.myNotebook.currentPageIndex, s.myNotebook.pages.length - 2),
+          updatedAt: Date.now(),
+        },
+      }))
     },
 
     addBlock: (pageIndex, block) =>

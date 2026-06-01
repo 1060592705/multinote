@@ -201,11 +201,12 @@ function NotebookTreeNode({
                   <FileText size={12} className="shrink-0" />
                   <span className="truncate">第 {page.pageNumber} 页</span>
 
-                  {isHovered && (
+                  {(isHovered && !isFriend && notebook.pages.length > 1) && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        // TODO: 删除页面
+                        useNotebookStore.getState().removeMyPage(idx)
+                        setHoveredPageId(null)
                       }}
                       className="ml-auto opacity-0 group-hover:opacity-100
                                  hover:text-[var(--danger)] transition-all"
