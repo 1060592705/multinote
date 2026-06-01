@@ -231,7 +231,6 @@ export function useLanSync(doc: Y.Doc, userId: string) {
         }
       }
     }
-    }
 
     notebooks.observeDeep(handler)
     handler()
