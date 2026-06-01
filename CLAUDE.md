@@ -32,6 +32,37 @@ MultiNote（双人计划本）是一个双人实时协作手写笔记本 Web 应
 - **状态**: Zustand（3 个 store：notebook / tool / UI）
 - **图标**: Lucide React
 
+## 分支与部署规范
+
+| 规则 | 说明 |
+|------|------|
+| **分支** | 统一使用 `master` 分支，不创建其他开发分支 |
+| **部署** | `npx vercel deploy --prod`（CLI 直接部署，不依赖 GitHub Actions） |
+| **推送** | 始终 `git push origin master` |
+| **GitHub Pages** | 由队友管理，**不要修改** `.github/workflows/` 和 `gh-pages` 分支 |
+
+### 每次提交前
+1. `npx tsc --noEmit` — 零错误
+2. `npm run build` — 构建成功
+3. 检查是否有遗留 debug 代码（`console.log` 等）
+
+### 提交信息规范
+- 格式：`type: 中文描述`
+- type: `feat` / `fix` / `refactor` / `chore` / `docs` / `style`
+- 示例：`fix: answerer 侧 DataChannel onopen 丢失导致单向同步`
+
+### 完整发布流程
+```
+1. npx tsc --noEmit          # 类型检查
+2. npm run build              # 构建
+3. git add -A
+4. git commit -m "..."        # 提交
+5. git push origin master     # 推送
+6. npx vercel deploy --prod   # 部署
+7. 更新 dev-logs/             # 写日志
+8. git push                   # 日志也推送
+```
+
 ## 日常工作流
 
 ### 开始新任务前
@@ -43,6 +74,7 @@ MultiNote（双人计划本）是一个双人实时协作手写笔记本 Web 应
 1. 更新 `dev-logs/YYYY-MM-DD.md`（完成事项 + 待办事项 + 关键决策）
 2. 更新 TodoWrite 任务状态
 3. 如有重要技术决策，同步更新相关 docs 文件
+4. 按上述发布流程部署
 
 ### 验证方式
 - 每个 Step 完成后运行 `npm run dev`
