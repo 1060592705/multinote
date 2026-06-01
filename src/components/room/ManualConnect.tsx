@@ -15,6 +15,7 @@ import { useManualSync } from '../../hooks/useManualSync'
 type Step =
   | 'init'          // 输入房间码
   | 'offer-ready'   // 发起方：offer 已生成
+  | 'connecting'    // 等待 DataChannel 打开
   | 'offer-done'    // 发起方：已完成连接
   | 'answer-input'  // 接收方：等待粘贴 offer
   | 'answer-ready'  // 接收方：answer 已生成
@@ -81,13 +82,28 @@ export default function ManualConnect({ onConnected, onBack, presetKey, role: pr
   }
 
   /* ── 监听连接状态 ── */
+  const connTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     if (sync.synced && doc) {
+      if (connTimerRef.current) clearTimeout(connTimerRef.current)
       setStep(role === 'offerer' ? 'offer-done' : 'answer-done')
       const t = setTimeout(() => onConnected(doc), 800)
       return () => clearTimeout(t)
     }
   }, [sync.synced, doc, role, onConnected])
+
+  // 连接超时（30 秒后仍未建立则提示）
+  useEffect(() => {
+    if (step !== 'connecting') return
+    connTimerRef.current = setTimeout(() => {
+      setError('连接超时，请检查双方是否在同一 WiFi 下，或重新发起连接')
+      setStep('error')
+    }, 30000)
+    return () => {
+      if (connTimerRef.current) clearTimeout(connTimerRef.current)
+    }
+  }, [step])
 
   /* ── 发起方：创建连接 ── */
   const handleCreate = useCallback(async () => {
@@ -125,10 +141,11 @@ export default function ManualConnect({ onConnected, onBack, presetKey, role: pr
 
     try {
       await sync.acceptAnswer(remoteSdp.trim())
+      setStep('connecting')
+      setLoading(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : '连接失败')
       setStep('error')
-    } finally {
       setLoading(false)
     }
   }, [remoteSdp, sync])
@@ -153,11 +170,11 @@ export default function ManualConnect({ onConnected, onBack, presetKey, role: pr
     try {
       const answerSdp = await sync.acceptOffer(remoteSdp.trim())
       setLocalSdp(answerSdp)
-      setStep('answer-ready')
+      setStep('connecting')
+      setLoading(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : '接受连接失败')
       setStep('error')
-    } finally {
       setLoading(false)
     }
   }, [remoteSdp, roomKey, sync])
@@ -305,6 +322,15 @@ export default function ManualConnect({ onConnected, onBack, presetKey, role: pr
         </div>
       )}
 
+      {/* 等待 DataChannel 连接 */}
+      {step === 'connecting' && (
+        <div className="flex flex-col items-center gap-3 py-8">
+          <Loader2 size={32} className="animate-spin text-[var(--accent)]" />
+          <p className="text-sm text-[var(--text-secondary)]">正在建立 P2P 连接...</p>
+          <p className="text-xs text-[var(--text-tertiary)]">请稍候，正在直连对方设备</p>
+        </div>
+      )}
+
       {/* 发起方：连接完成 */}
       {step === 'offer-done' && <ConnectedMessage />}
 
@@ -334,14 +360,21 @@ export default function ManualConnect({ onConnected, onBack, presetKey, role: pr
         </div>
       )}
 
-      {/* 接收方：Answer 已生成 */}
-      {step === 'answer-ready' && (
+      {/* 接收方：Answer 已生成（connecting 状态下也显示，方便复制后发送） */}
+      {(step === 'answer-ready' || (step === 'connecting' && role === 'answerer' && localSdp)) && (
         <div className="space-y-4">
-          <StepLabel num={2} text="复制这段回传码，微信发给对方" />
+          <StepLabel num={1} text="复制这段回传码，微信发给对方" />
           <CopyBox text={localSdp} copied={copiedAnswer} onCopy={() => setCopiedAnswer(true)} />
-          <p className="text-xs text-[var(--text-tertiary)] text-center">
-            等待对方粘贴你的回传码后，连接即建立
-          </p>
+          {step === 'connecting' ? (
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <Loader2 size={20} className="animate-spin text-[var(--accent)]" />
+              <p className="text-xs text-[var(--text-tertiary)]">等待对方粘贴你的回传码，连接即建立</p>
+            </div>
+          ) : (
+            <p className="text-xs text-[var(--text-tertiary)] text-center">
+              等待对方粘贴你的回传码后，连接即建立
+            </p>
+          )}
         </div>
       )}
 
