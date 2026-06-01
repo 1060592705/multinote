@@ -57,11 +57,12 @@ export function useManualSync(
     const provider = new ManualSignalingProvider(currentDoc, roomKey)
     providerRef.current = provider
 
-    provider.on('state', ([s]: [ConnectionState]) => {
+    // emit('state', [obj]) 经过 lib0/observable 展开为 f(obj)，obj 是普通对象非数组
+    provider.on('state', (s: ConnectionState) => {
       setState({ ...s })
     })
 
-    provider.on('synced', ([data]: [{ synced: boolean }]) => {
+    provider.on('synced', (data: { synced: boolean }) => {
       setSynced(data.synced)
     })
 
