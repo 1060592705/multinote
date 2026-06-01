@@ -16,7 +16,7 @@ import { ICE_SERVERS } from '../constants'
    ═══════════════════════════════════════════ */
 
 /** 等待 ICE 候选收集完成的最大时间（ms） */
-const ICE_GATHER_TIMEOUT = 5000
+const ICE_GATHER_TIMEOUT = 15000
 
 /* ═══════════════════════════════════════════
    连接 ID 生成
@@ -352,14 +352,14 @@ export class ManualSignalingProvider extends Observable<string> {
     if (this._disposed) return
     if (!this.dc || this.dc.readyState !== 'open') return
     const stateUpdate = Y.encodeStateAsUpdate(this.doc)
-    this.dc.send(stateUpdate.buffer)
+    this.dc.send(stateUpdate.buffer as ArrayBuffer)
   }
 
   /** 同步步骤2：发送增量更新（在 doc.on('update') 中触发） */
   private syncStep2(update: Uint8Array, _origin: unknown): void {
     if (this._disposed) return
     if (!this.dc || this.dc.readyState !== 'open') return
-    this.dc.send(update.buffer)
+    this.dc.send(update.buffer as ArrayBuffer)
   }
 
   /** 等待 ICE 候选收集完成 */

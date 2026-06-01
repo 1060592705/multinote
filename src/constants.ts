@@ -67,17 +67,20 @@ export const SIGNALING_SERVERS = [
   'wss://y-webrtc-signaling-us.herokuapp.com',
 ]
 
-/** WebRTC ICE 服务器（STUN），用于 NAT 穿透 */
+/** WebRTC ICE 服务器（STUN + TURN），NAT 穿透 + 中继兜底 */
 export const ICE_SERVERS: RTCIceServer[] = [
+  // STUN (NAT 穿透)
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun2.l.google.com:19302' },
   { urls: 'stun:stun.cloudflare.com:3478' },
   { urls: 'stun:stun.nextcloud.com:443' },
-  { urls: 'stun:stun.miwifi.com:3478' },
-  { urls: 'stun:stun.qq.com:3478' },
-  { urls: 'stun:stun.ekiga.net:3478' },
-  { urls: 'stun:stun.voipbuster.com:3478' },
+  // TURN 中继（P2P 直连失败时兜底）
+  {
+    urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443'],
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
 ]
 
 /** WebRTC P2P 连接超时（毫秒） */
