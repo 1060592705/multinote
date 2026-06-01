@@ -70,7 +70,13 @@ export const SIGNALING_SERVERS = [
 export const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
   { urls: 'stun:stun.nextcloud.com:443' },
+  { urls: 'stun:stun.miwifi.com:3478' },
+  { urls: 'stun:stun.qq.com:3478' },
+  { urls: 'stun:stun.ekiga.net:3478' },
+  { urls: 'stun:stun.voipbuster.com:3478' },
 ]
 
 /** WebRTC P2P 连接超时（毫秒） */
