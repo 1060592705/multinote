@@ -1,9 +1,19 @@
-import { useState } from 'react'
+import { useState, Component, type ReactNode } from 'react'
 import * as Y from 'yjs'
 import { ArrowLeft, Copy, Check, Wifi } from 'lucide-react'
 import type { RoomState } from '../../App'
 import { generateRoomCode, generateUserId } from '../../lib/room'
 import ManualConnect from './ManualConnect'
+
+/* ── 调试用错误边界 ── */
+class EB extends Component<{ children: ReactNode; name: string }, { err: Error | null }> {
+  constructor(props: { children: ReactNode; name: string }) { super(props); this.state = { err: null } }
+  static getDerivedStateFromError(err: Error) { return { err } }
+  render() {
+    if (this.state.err) return <div className="p-3 rounded bg-red-50 text-red-600 text-xs font-mono whitespace-pre-wrap">[{this.props.name}]\n{this.state.err.message}\n\n{this.state.err.stack?.split('\n').slice(0,6).join('\n')}</div>
+    return this.props.children
+  }
+}
 
 type Props = {
   onJoin: (room: RoomState) => void
@@ -100,14 +110,16 @@ export default function CreateRoom({ onJoin, onBack, onLanConnect }: Props) {
 
         {/* ── 局域网模式 ── */}
         {mode === 'lan' && (
-          <ManualConnect
-            onConnected={(doc) => {
-              const lanUserId = `lan-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-              onLanConnect(doc, lanUserId, roomCode)
-            }}
-            onBack={() => setMode('online')}
-            presetKey={roomCode}
-          />
+          <EB name="CreateRoom→ManualConnect">
+            <ManualConnect
+              onConnected={(doc) => {
+                const lanUserId = `lan-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+                onLanConnect(doc, lanUserId, roomCode)
+              }}
+              onBack={() => setMode('online')}
+              presetKey={roomCode}
+            />
+          </EB>
         )}
       </div>
     </div>
