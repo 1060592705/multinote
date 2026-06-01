@@ -213,15 +213,13 @@ export default function ManualConnect({ onConnected, onBack, presetKey, role: pr
               onChange={(e) => setRoomKey(e.target.value.toUpperCase())}
               placeholder={presetKey || "例如：COFFEE"}
               maxLength={10}
-              readOnly={!!presetKey}
               className="w-full px-4 py-2.5 text-center text-lg tracking-[0.3em] font-mono
                          bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg
                          text-[var(--text-primary)] placeholder-[var(--text-tertiary)]
-                         focus:outline-none focus:ring-2 focus:ring-[var(--accent)]
-                         read-only:opacity-60"
+                         focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             />
             {presetKey && (
-              <p className="text-xs text-[var(--accent)] mt-1 text-center">使用房间码作为连接密钥</p>
+              <p className="text-xs text-[var(--accent)] mt-1 text-center">房间码已预填，可手动修改</p>
             )}
           </div>
 
