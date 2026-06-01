@@ -26,6 +26,7 @@ export default function RoomGate({ onJoin, onLanConnect }: Props) {
     return (
       <JoinRoom
         onJoin={onJoin}
+        onLanConnect={onLanConnect}
         onBack={() => setMode('choose')}
       />
     )

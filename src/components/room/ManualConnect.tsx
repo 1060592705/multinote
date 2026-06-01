@@ -28,8 +28,10 @@ type Props = {
   onConnected: (doc: Y.Doc) => void
   /** 返回 */
   onBack: () => void
-  /** 预设房间码（从创建房间传入） */
+  /** 预设房间码（从创建/加入房间传入） */
   presetKey?: string
+  /** 预设角色（创建方为 offerer，加入方为 answerer） */
+  role?: 'offerer' | 'answerer'
 }
 
 /* ── 辅助 ── */
@@ -51,11 +53,12 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export default function ManualConnect({ onConnected, onBack, presetKey }: Props) {
+export default function ManualConnect({ onConnected, onBack, presetKey, role: presetRole }: Props) {
   /* ── 状态 ── */
   const [roomKey, setRoomKey] = useState(presetKey || '')
-  const [role, setRole] = useState<'offerer' | 'answerer' | null>(null)
-  const [step, setStep] = useState<Step>('init')
+  const [role, setRole] = useState<'offerer' | 'answerer' | null>(presetRole || null)
+  // 预设 answerer 角色时直接进入粘贴 offer 步骤
+  const [step, setStep] = useState<Step>(presetRole === 'answerer' ? 'answer-input' : 'init')
   const [localSdp, setLocalSdp] = useState('')
   const [remoteSdp, setRemoteSdp] = useState('')
   const [copiedOffer, setCopiedOffer] = useState(false)
