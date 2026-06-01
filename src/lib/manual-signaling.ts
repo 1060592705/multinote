@@ -319,7 +319,13 @@ export class ManualSignalingProvider extends Observable<string> {
       `_creatingOffer=${this._creatingOffer} _disposed=${this._disposed}`
     )
 
-    // 信令状态守卫：pc 必须处于 have-local-offer 状态才能接受 answer
+    // 幂等处理：如果已接受过 answer（pc 已是 stable 且有 remote description），直接返回
+    if (sigState === 'stable' && hasRemote) {
+      console.log(`[MS#${this._providerId}] acceptAnswer: already accepted (idempotent), skipping`)
+      return
+    }
+
+    // 状态守卫：pc 必须处于 have-local-offer
     if (sigState !== 'have-local-offer') {
       throw new Error(
         `连接状态异常 (${sigState})，请点击"发起连接"重新生成连接码`

@@ -112,14 +112,15 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
   /* ── 发起方：创建连接 ── */
   const handleCreate = useCallback(async () => {
     if (loading || lockRef.current) return
+    lockRef.current = true
     if (!roomKey.trim()) {
       setError('请先输入房间码')
+      lockRef.current = false
       return
     }
     setError('')
     setRole('offerer')
     setLoading(true)
-    lockRef.current = true
 
     // 先确保 doc 存在（直接写 ref，不依赖 React 重渲染）
     ensureDoc()
@@ -140,9 +141,9 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
   /* ── 恢复：连接状态异常时重新生成 offer ── */
   const handleRetry = useCallback(async () => {
     if (loading || lockRef.current) return
+    lockRef.current = true
     setError('')
     setLoading(true)
-    lockRef.current = true
 
     try {
       const sdp = await sync.createOffer()
@@ -160,13 +161,14 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
   /* ── 发起方：粘贴 answer 完成连接 ── */
   const handleAcceptAnswer = useCallback(async () => {
     if (loading || lockRef.current) return
+    lockRef.current = true
     if (!remoteSdp.trim()) {
       setError('请先粘贴对方回传的连接码')
+      lockRef.current = false
       return
     }
     setError('')
     setLoading(true)
-    lockRef.current = true
     ensureDoc()
 
     try {
@@ -183,18 +185,20 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
   /* ── 接收方：粘贴 offer → 生成 answer ── */
   const handleAcceptOffer = useCallback(async () => {
     if (loading || lockRef.current) return
+    lockRef.current = true
     if (!remoteSdp.trim()) {
       setError('请先粘贴对方的连接码')
+      lockRef.current = false
       return
     }
     if (!roomKey.trim()) {
       setError('请先输入房间码')
+      lockRef.current = false
       return
     }
     setError('')
     setRole('answerer')
     setLoading(true)
-    lockRef.current = true
 
     // 先确保 doc 存在
     ensureDoc()
@@ -255,6 +259,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
           {/* 连接状态异常时可一键重新发起 */}
           {error.includes('连接状态异常') && (
             <button
+              type="button"
               onClick={handleRetry}
               disabled={loading}
               className="w-full py-2 rounded-lg bg-[var(--accent)] text-white text-sm
@@ -294,6 +299,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
           <div className="flex gap-3">
             {defaultRole !== 'answerer' && (
               <button
+                type="button"
                 onClick={handleCreate}
                 disabled={!roomKey.trim() || loading}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
@@ -340,6 +346,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
           />
 
           <button
+            type="button"
             onClick={handleAcceptAnswer}
             disabled={!remoteSdp.trim() || loading}
             className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white
@@ -370,6 +377,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
           />
 
           <button
+            type="button"
             onClick={handleAcceptOffer}
             disabled={!remoteSdp.trim() || loading}
             className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white
