@@ -9,14 +9,15 @@
 
 import * as Y from 'yjs'
 import { Observable } from 'lib0/observable'
-import { ICE_SERVERS } from './constants'
 
 /* ═══════════════════════════════════════════
    常量
    ═══════════════════════════════════════════ */
 
-/** 等待 ICE 候选收集完成的最大时间（ms） */
-const ICE_GATHER_TIMEOUT = 8000
+/** 等待 ICE 候选收集完成的最大时间（ms）
+ *  局域网模式下仅收集 host 候选（mDNS），通常 1-3 秒完成。
+ *  部分移动设备 mDNS 较慢，给 15 秒足够。 */
+const ICE_GATHER_TIMEOUT = 15000
 
 /* ═══════════════════════════════════════════
    连接 ID 生成
@@ -382,7 +383,15 @@ export class ManualSignalingProvider extends Observable<string> {
      内部方法
      ═══════════════════════════════════════════ */
 
-  /** 创建 RTCPeerConnection，配置 STUN 服务器辅助 NAT 穿透 */
+  /**
+   * 创建 RTCPeerConnection（局域网 mDNS 直连）
+   *
+   * 使用空 iceServers：仅收集 host 候选（本地 IP/mDNS），不依赖外部 STUN。
+   * 理由：
+   *  - 同 WiFi 下 host 候选即可直连，mDNS 自动解析 .local 地址
+   *  - 中国大陆 Google STUN 被墙，等待 STUN 超时会延长 ICE 收集时间
+   *  - STUN 仅提供 srflx 候选（公网映射地址），同 WiFi 场景无帮助
+   */
   private createPeerConnection(): RTCPeerConnection {
     // 清理旧连接
     if (this.pc) {
@@ -400,7 +409,7 @@ export class ManualSignalingProvider extends Observable<string> {
     this._iceStartTime = Date.now()
 
     this.pc = new RTCPeerConnection({
-      iceServers: ICE_SERVERS,
+      iceServers: [],
     })
 
     // 收集 ICE 候选诊断信息
