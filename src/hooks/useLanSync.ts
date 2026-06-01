@@ -154,7 +154,6 @@ export function useLanSync(doc: Y.Doc, userId: string) {
     const notebooks = sync.doc.getMap('notebooks')
 
     const handler = () => {
-      try {
       // 1. 同步朋友笔记本（非自身 user 的 notebook）
       notebooks.forEach((_nbMap, key) => {
         if (key === userId) return
@@ -232,9 +231,6 @@ export function useLanSync(doc: Y.Doc, userId: string) {
         }
       }
     }
-      } catch (e) {
-        console.error('[useLanSync] observeDeep handler error:', e)
-      }
     }
 
     notebooks.observeDeep(handler)
