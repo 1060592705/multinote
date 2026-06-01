@@ -169,7 +169,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, role: pr
       <div className="flex flex-col items-center justify-center gap-4 py-12">
         <Loader2 size={32} className="animate-spin text-[var(--accent)]" />
         <p className="text-sm text-[var(--text-secondary)]">
-          {role === 'offerer' ? '正在建立连接...' : '正在处理...'}
+          {role === 'offerer' ? '正在生成连接码...' : '正在生成回传码...'}
         </p>
       </div>
     )
@@ -197,6 +197,14 @@ export default function ManualConnect({ onConnected, onBack, presetKey, role: pr
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm">
           <AlertCircle size={16} />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* SDP 长度警告（可能被微信截断） */}
+      {(step === 'offer-ready' || step === 'answer-input') && remoteSdp.trim().length > 0 && remoteSdp.trim().length < 100 && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-50 text-yellow-700 text-sm">
+          <AlertCircle size={16} />
+          <span>连接码过短，可能复制不完整（被微信截断），请让对方重新发送</span>
         </div>
       )}
 
