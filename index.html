@@ -33,12 +33,12 @@
         var reason = event.reason;
         showErrorBox('unhandledrejection', reason && reason.message ? reason.message : String(reason), reason && reason.stack ? reason.stack : '');
       });
-      console.log('[debug v2] index.html error handlers installed | build: 8fe7fc6');
-      // 版本标签（右下角）
+      console.log('[debug v4] index.html error handlers installed | build: d3cb8e3');
+      // 版本标签（底部醒目横条）
       var vBadge = document.createElement('div');
       vBadge.id = 'version-badge';
-      vBadge.style.cssText = 'position:fixed;bottom:8px;right:12px;z-index:99998;background:rgba(0,0,0,.65);color:#aaa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:11px;pointer-events:none';
-      vBadge.textContent = 'debug-8fe7fc6';
+      vBadge.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99998;background:#A78BFA;color:#fff;padding:6px 16px;font-family:monospace;font-size:13px;text-align:center;font-weight:bold;letter-spacing:0.1em';
+      vBadge.textContent = '🔗 MultiNote | debug-d3cb8e3 | 2026-06-01';
       document.body.appendChild(vBadge);
     </script>
     <script type="module" src="/src/main.tsx"></script>
