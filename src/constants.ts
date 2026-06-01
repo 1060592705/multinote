@@ -61,6 +61,7 @@ export const AUTO_SAVE_DELAY = 5000  // 自动保存防抖间隔 (ms)
 /* ── 同步 ── */
 /** WebRTC 信令服务器（用于 P2P 连接协商） */
 export const SIGNALING_SERVERS = [
+  'ws://localhost:4444',  // 本地信令服务器（运行 signaling-server.cmd 启动）
   'wss://signaling.yjs.dev',
   'wss://y-webrtc-signaling-eu.herokuapp.com',
   'wss://y-webrtc-signaling-us.herokuapp.com',

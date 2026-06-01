@@ -71,7 +71,7 @@ export default function App() {
 function RoomApp({ room }: { room: NonNullable<RoomState> }) {
   useYjsSync(room.roomCode, room.userId)
   useAutoSave(room.userId)
-  return <RoomUI />
+  return <RoomUI roomCode={room.roomCode} />
 }
 
 /** 局域网直连模式主界面 */
@@ -80,11 +80,11 @@ function LanRoomApp({ lan }: { lan: LanState }) {
   userIdRef.current = lan.userId
   useLanSync(lan.doc, lan.userId)
   useAutoSave(lan.userId)
-  return <RoomUI />
+  return <RoomUI roomCode={lan.roomKey} />
 }
 
 /** 主界面 UI（WebRTC 和 LAN 共用） */
-function RoomUI() {
+function RoomUI({ roomCode }: { roomCode: string }) {
   const {
     scale, userZoom,
     isDual, screenWide, zoomBy, resetZoom, containerRef,

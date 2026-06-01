@@ -25,13 +25,16 @@ const BRUSH_OPTIONS: { type: BrushType; icon: React.ReactNode; label: string }[]
 
 /* ── Props ── */
 
+import { Copy, Check } from 'lucide-react'
+
 type Props = {
   scale: number
   userZoom: number
   onResetZoom: () => void
+  roomCode: string
 }
 
-export default function Toolbar({ scale, userZoom, onResetZoom }: Props) {
+export default function Toolbar({ scale, userZoom, onResetZoom, roomCode }: Props) {
   /* ── Store ── */
   const activeBrush = useToolStore((s) => s.activeBrush)
   const setBrush = useToolStore((s) => s.setBrush)
@@ -200,6 +203,9 @@ export default function Toolbar({ scale, userZoom, onResetZoom }: Props) {
           {showFriendDoodles ? <Eye size={16} /> : <EyeOff size={16} />}
         </button>
 
+        {/* 房间码 */}
+        <RoomCodeBadge roomCode={roomCode} />
+
         {/* 缩放显示 */}
         <div className="flex items-center gap-1 text-[11px] text-[var(--text-secondary)] min-w-[60px]">
           <ZoomIn size={13} />
@@ -282,5 +288,33 @@ export default function Toolbar({ scale, userZoom, onResetZoom }: Props) {
         </div>
       )}
     </div>
+  )
+}
+
+function RoomCodeBadge({ roomCode }: { roomCode: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const url = `${window.location.origin}${window.location.pathname}?room=${roomCode}`
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      await navigator.clipboard.writeText(roomCode)
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[var(--bg-tertiary)]
+                 hover:bg-[var(--border)] transition-colors cursor-pointer"
+      title="复制房间链接"
+    >
+      <span className="text-[11px] font-mono font-bold text-[var(--accent)] tracking-wider">
+        {roomCode}
+      </span>
+      {copied ? <Check size={12} className="text-[var(--success)]" /> : <Copy size={12} className="text-[var(--text-tertiary)]" />}
+    </button>
   )
 }
