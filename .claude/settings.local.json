@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(timeout 8 npm run dev)",
+      "Bash(npm run *)",
+      "Bash(npm i *)",
+      "Bash(vercel)",
+      "Bash(vercel --prod)",
+      "WebSearch",
+      "Bash(npm uninstall *)"
+    ]
+  }
+}
