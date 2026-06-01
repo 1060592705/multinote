@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import * as Y from 'yjs'
 import RoomGate from './components/room/RoomGate'
 import Sidebar from './components/layout/Sidebar'
 import Toolbar from './components/layout/Toolbar'
@@ -7,6 +8,7 @@ import CanvasScaler from './components/layout/CanvasScaler'
 import MobileNav from './components/layout/MobileNav'
 import { useUIStore } from './store/useUIStore'
 import { useYjsSync } from './hooks/useYjsSync'
+import { useLanSync } from './hooks/useLanSync'
 import { useAutoSave } from './hooks/useAutoSave'
 import { useCanvasScale } from './hooks/useCanvasScale'
 import { getRoomFromURL, generateUserId } from './lib/room'
@@ -17,8 +19,15 @@ export type RoomState = {
   isHost: boolean
 } | null
 
+/** 局域网直连状态 */
+interface LanState {
+  doc: Y.Doc
+  userId: string
+}
+
 export default function App() {
   const [room, setRoom] = useState<RoomState>(null)
+  const [lan, setLan] = useState<LanState | null>(null)
   const setDarkMode = useUIStore((s) => s.setDarkMode)
 
   useEffect(() => {
@@ -41,18 +50,40 @@ export default function App() {
     }
   }, [])
 
-  if (!room) {
-    return <RoomGate onJoin={setRoom} />
+  /** 局域网直连回调 */
+  const handleLanConnect = (doc: Y.Doc, userId: string) => {
+    setLan({ doc, userId })
   }
 
-  return <RoomApp room={room} />
+  if (!room && !lan) {
+    return <RoomGate onJoin={setRoom} onLanConnect={handleLanConnect} />
+  }
+
+  if (lan) {
+    return <LanRoomApp lan={lan} />
+  }
+
+  return <RoomApp room={room!} />
 }
 
-/** 进入房间后的主界面 */
+/** WebRTC 模式主界面 */
 function RoomApp({ room }: { room: NonNullable<RoomState> }) {
   useYjsSync(room.roomCode, room.userId)
   useAutoSave(room.userId)
+  return <RoomUI />
+}
 
+/** 局域网直连模式主界面 */
+function LanRoomApp({ lan }: { lan: LanState }) {
+  const userIdRef = useRef(lan.userId)
+  userIdRef.current = lan.userId
+  useLanSync(lan.doc, lan.userId, null)
+  useAutoSave(lan.userId)
+  return <RoomUI />
+}
+
+/** 主界面 UI（WebRTC 和 LAN 共用） */
+function RoomUI() {
   const {
     scale, userZoom,
     isDual, screenWide, zoomBy, resetZoom, containerRef,
@@ -72,11 +103,9 @@ function RoomApp({ room }: { room: NonNullable<RoomState> }) {
         onResetZoom={resetZoom}
       />
       <div className="flex-1 flex overflow-hidden">
-        {/* 侧边栏：flex 行内推挤画布，transition-all 实现滑动动效 */}
         <div className="hidden sm:block shrink-0">
           <Sidebar />
         </div>
-        {/* 画布区域：flex-1 被推挤时自动重计算缩放 */}
         <CanvasScaler
           scale={scale}
           isDual={isDual}
