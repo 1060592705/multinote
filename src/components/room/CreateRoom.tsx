@@ -70,7 +70,7 @@ export default function CreateRoom({ onJoin, onBack, onLanConnect }: Props) {
                 : 'text-[var(--text-tertiary)]'
             }`}
           >
-            在线连接
+            自动连接
           </button>
           <button
             onClick={() => setMode('lan')}
@@ -81,13 +81,14 @@ export default function CreateRoom({ onJoin, onBack, onLanConnect }: Props) {
             }`}
           >
             <Wifi size={13} />
-            局域网直连
+            离线直连
           </button>
         </div>
 
         {/* ── 在线模式 ── */}
         {mode === 'online' && (
           <div className="space-y-3">
+            <p className="text-xs text-[var(--text-tertiary)]">同一 WiFi 下自动 P2P 直连 · 对方输入房间码即连</p>
             <button onClick={handleCopy} className="btn-accent w-full py-2.5 flex items-center justify-center gap-2">
               {copied ? <Check size={18} /> : <Copy size={18} />}
               {copied ? '已复制！' : '复制链接'}

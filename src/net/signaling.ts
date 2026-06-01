@@ -313,11 +313,19 @@ export class ManualSignalingProvider extends Observable<string> {
   private setupDataChannel(channel: RTCDataChannel): void {
     channel.binaryType = 'arraybuffer'
 
-    channel.onopen = () => {
+    const handleOpen = () => {
+      if (this._disposed) return
       console.log('[ManualSignaling] DataChannel opened')
       this._synced = true
-      this.syncStep1() // 发送初始状态
+      this.syncStep1()
       this.emit('synced', [{ synced: true }])
+    }
+
+    channel.onopen = handleOpen
+
+    // 处理 channel 在设置 onopen 之前就已打开的情况（如 answerer 收到已打开的信道）
+    if (channel.readyState === 'open') {
+      handleOpen()
     }
 
     channel.onclose = () => {

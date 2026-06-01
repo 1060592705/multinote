@@ -185,7 +185,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, role: pr
       <div>
         <div className="flex items-center gap-2 mb-1">
           <Wifi size={18} className="text-[var(--accent)]" />
-          <h3 className="text-lg font-semibold text-[var(--text-primary)]">局域网直连</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">离线直连</h3>
         </div>
         <p className="text-xs text-[var(--text-tertiary)]">
           零服务器 · 同 WiFi 直连 · 微信复制粘贴两段文字即连

@@ -84,7 +84,7 @@ export default function JoinRoom({ onJoin, onBack, onLanConnect }: Props) {
                 : 'text-[var(--text-tertiary)]'
             }`}
           >
-            在线连接
+            自动连接
           </button>
           <button
             onClick={() => setMode('lan')}
@@ -95,7 +95,7 @@ export default function JoinRoom({ onJoin, onBack, onLanConnect }: Props) {
             }`}
           >
             <Wifi size={13} />
-            局域网直连
+            离线直连
           </button>
         </div>
 
@@ -112,7 +112,10 @@ export default function JoinRoom({ onJoin, onBack, onLanConnect }: Props) {
           </button>
         )}
 
-        {/* 局域网模式 — 输入房间码后粘贴对方的 offer */}
+        {/* 离线直连 — 无需网络，需双方手动交换连接码 */}
+        {mode === 'lan' && (
+          <p className="text-xs text-[var(--text-tertiary)] mb-4">无网络环境使用 · 双方向对方各发一段文字即连</p>
+        )}
         {mode === 'lan' && (
           <ManualConnect
             onConnected={(doc) => {
