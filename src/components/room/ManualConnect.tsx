@@ -200,6 +200,25 @@ export default function ManualConnect({ onConnected, onBack, presetKey, role: pr
         </div>
       )}
 
+      {/* 房间码 — 非 init 步骤时始终显示，方便验证和修改 */}
+      {step !== 'init' && (
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-tertiary)] mb-1">
+            房间码
+          </label>
+          <input
+            type="text"
+            value={roomKey}
+            onChange={(e) => setRoomKey(e.target.value.toUpperCase())}
+            maxLength={10}
+            className="w-full px-3 py-2 text-center text-sm tracking-[0.3em] font-mono
+                       bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg
+                       text-[var(--text-primary)]
+                       focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+          />
+        </div>
+      )}
+
       {/* Step: 输入房间码 + 选择角色 */}
       {step === 'init' && (
         <div className="space-y-4">
