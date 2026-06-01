@@ -4,11 +4,12 @@
  * 管理 ManualSignalingProvider 的生命周期，
  * 暴露创建/接受连接的方法和状态。
  *
- * 使用 docRef 避免 React 闭包中 doc 过时问题：
- * setState 是异步的，click handler 调用时新 doc 可能还未渲染。
+ * 使用 MutableRefObject<Y.Doc | null> 而非 Y.Doc | null：
+ * 避免 React 闭包中 doc 过时 —— 调用方可以直接写 ref.current，
+ * 不依赖 React 重渲染，确保 provider 创建时一定能读到 doc。
  */
 
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect, type MutableRefObject } from 'react'
 import * as Y from 'yjs'
 import {
   ManualSignalingProvider,
@@ -17,28 +18,18 @@ import {
 } from '../lib/manual-signaling'
 
 export interface UseManualSyncReturn {
-  /** 连接状态 */
   state: ConnectionState
-  /** 是否已连接并同步 */
   synced: boolean
-  /** 发起方：创建 offer → 返回 SDP 文本供复制 */
   createOffer: () => Promise<string>
-  /** 接收方：接受 offer → 返回 answer SDP 文本供复制 */
   acceptOffer: (sdpText: string) => Promise<string>
-  /** 发起方：接受 answer → 完成连接 */
   acceptAnswer: (sdpText: string) => Promise<void>
-  /** 断开连接 */
   disconnect: () => void
 }
 
 export function useManualSync(
-  doc: Y.Doc | null,
+  docRef: MutableRefObject<Y.Doc | null>,
   roomKey: string,
 ): UseManualSyncReturn {
-  const docRef = useRef<Y.Doc | null>(doc)
-  // 始终保持 ref 与最新 doc 同步
-  docRef.current = doc
-
   const providerRef = useRef<ManualSignalingProvider | null>(null)
   const detachRef = useRef<(() => void) | null>(null)
   const [state, setState] = useState<ConnectionState>({
@@ -54,11 +45,10 @@ export function useManualSync(
     if (providerRef.current && !providerRef.current['_disposed']) {
       return providerRef.current
     }
-    // 通过 ref 读取 doc，避免闭包过时
+    // 直接从 ref 读 doc —— 调用方可以同步设置 ref.current，不依赖 React 重渲染
     const currentDoc = docRef.current
     if (!currentDoc) throw new Error('文档未初始化')
 
-    // 清理旧 provider
     if (detachRef.current) {
       detachRef.current()
       detachRef.current = null
@@ -67,7 +57,6 @@ export function useManualSync(
     const provider = new ManualSignalingProvider(currentDoc, roomKey)
     providerRef.current = provider
 
-    // 监听状态变化
     provider.on('state', ([s]: [ConnectionState]) => {
       setState({ ...s })
     })
@@ -84,11 +73,10 @@ export function useManualSync(
       setSynced(false)
     })
 
-    // 挂载 doc update 监听（本地更新→发送给对等端）
     detachRef.current = attachDocSync(provider)
 
     return provider
-  }, [roomKey])
+  }, [docRef, roomKey])
 
   /* ── 清理 ── */
   useEffect(() => {
@@ -103,8 +91,6 @@ export function useManualSync(
       }
     }
   }, [])
-
-  /* ── 公开方法 ── */
 
   const createOffer = useCallback(async (): Promise<string> => {
     const provider = ensureProvider()

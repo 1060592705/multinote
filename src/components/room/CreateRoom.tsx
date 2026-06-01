@@ -1,15 +1,21 @@
 import { useState } from 'react'
-import { ArrowLeft, Copy, Check } from 'lucide-react'
+import * as Y from 'yjs'
+import { ArrowLeft, Copy, Check, Wifi } from 'lucide-react'
 import type { RoomState } from '../../App'
 import { generateRoomCode, generateUserId } from '../../lib/room'
+import ManualConnect from './ManualConnect'
 
 type Props = {
   onJoin: (room: RoomState) => void
   onBack: () => void
+  onLanConnect: (doc: Y.Doc, userId: string, roomKey: string) => void
 }
 
-export default function CreateRoom({ onJoin, onBack }: Props) {
+type ConnMode = 'online' | 'lan'
+
+export default function CreateRoom({ onJoin, onBack, onLanConnect }: Props) {
   const [copied, setCopied] = useState(false)
+  const [mode, setMode] = useState<ConnMode>('online')
 
   const [roomCode] = useState(() => generateRoomCode())
   const [userId] = useState(() => generateUserId())
@@ -25,7 +31,6 @@ export default function CreateRoom({ onJoin, onBack }: Props) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // fallback: 复制房间码
       await navigator.clipboard.writeText(roomCode)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
@@ -55,16 +60,55 @@ export default function CreateRoom({ onJoin, onBack }: Props) {
           </p>
         </div>
 
-        {/* 操作按钮 */}
-        <div className="space-y-3">
-          <button onClick={handleCopy} className="btn-accent w-full py-2.5 flex items-center justify-center gap-2">
-            {copied ? <Check size={18} /> : <Copy size={18} />}
-            {copied ? '已复制！' : '复制链接'}
+        {/* ── 连接方式切换 ── */}
+        <div className="flex mb-6 bg-[var(--bg-tertiary)] rounded-lg p-1">
+          <button
+            onClick={() => setMode('online')}
+            className={`flex-1 py-1.5 text-sm rounded-md transition-all ${
+              mode === 'online'
+                ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm font-medium'
+                : 'text-[var(--text-tertiary)]'
+            }`}
+          >
+            在线连接
           </button>
-          <button onClick={handleEnter} className="w-full py-2.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors font-medium">
-            进入房间
+          <button
+            onClick={() => setMode('lan')}
+            className={`flex-1 py-1.5 text-sm rounded-md transition-all flex items-center justify-center gap-1 ${
+              mode === 'lan'
+                ? 'bg-[var(--bg-primary)] text-[var(--accent)] shadow-sm font-medium'
+                : 'text-[var(--text-tertiary)]'
+            }`}
+          >
+            <Wifi size={13} />
+            局域网直连
           </button>
         </div>
+
+        {/* ── 在线模式 ── */}
+        {mode === 'online' && (
+          <div className="space-y-3">
+            <button onClick={handleCopy} className="btn-accent w-full py-2.5 flex items-center justify-center gap-2">
+              {copied ? <Check size={18} /> : <Copy size={18} />}
+              {copied ? '已复制！' : '复制链接'}
+            </button>
+            <button onClick={handleEnter} className="w-full py-2.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors font-medium">
+              进入房间
+            </button>
+          </div>
+        )}
+
+        {/* ── 局域网模式 ── */}
+        {mode === 'lan' && (
+          <ManualConnect
+            onConnected={(doc) => {
+              const lanUserId = `lan-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+              onLanConnect(doc, lanUserId, roomCode)
+            }}
+            onBack={() => setMode('online')}
+            presetKey={roomCode}
+          />
+        )}
       </div>
     </div>
   )

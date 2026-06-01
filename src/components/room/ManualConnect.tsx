@@ -5,40 +5,40 @@
  * 同 WiFi 下 mDNS 局域网直连，零外部服务器。
  */
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import * as Y from 'yjs'
-import { Copy, Check, Link, Loader2, Wifi, ArrowRightLeft, AlertCircle } from 'lucide-react'
+import { Copy, Check, Link, Loader2, Wifi, ArrowRightLeft, AlertCircle, ArrowLeft } from 'lucide-react'
 import { useManualSync } from '../../hooks/useManualSync'
 
 /* ── 步骤枚举 ── */
 
 type Step =
   | 'init'          // 输入房间码
-  | 'offer-ready'   // 发起方：offer 已生成，等待复制 + 等待 answer
+  | 'offer-ready'   // 发起方：offer 已生成
   | 'offer-done'    // 发起方：已完成连接
   | 'answer-input'  // 接收方：等待粘贴 offer
-  | 'answer-ready'  // 接收方：answer 已生成，等待复制
+  | 'answer-ready'  // 接收方：answer 已生成
   | 'answer-done'   // 接收方：已完成连接
   | 'error'         // 错误
 
 /* ── Props ── */
 
 type Props = {
-  /** 连接成功后回调，传入 Y.Doc（用于后续 Yjs 同步） */
+  /** 连接成功后回调 */
   onConnected: (doc: Y.Doc) => void
-  /** 返回首页 */
+  /** 返回 */
   onBack: () => void
+  /** 预设房间码（从创建房间传入） */
+  presetKey?: string
 }
 
 /* ── 辅助 ── */
 
-/** 复制文本到剪贴板 */
 async function copyToClipboard(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text)
     return true
   } catch {
-    // 回退方案
     const ta = document.createElement('textarea')
     ta.value = text
     ta.style.position = 'fixed'
@@ -51,9 +51,9 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export default function ManualConnect({ onConnected, onBack }: Props) {
+export default function ManualConnect({ onConnected, onBack, presetKey }: Props) {
   /* ── 状态 ── */
-  const [roomKey, setRoomKey] = useState('')
+  const [roomKey, setRoomKey] = useState(presetKey || '')
   const [role, setRole] = useState<'offerer' | 'answerer' | null>(null)
   const [step, setStep] = useState<Step>('init')
   const [localSdp, setLocalSdp] = useState('')
@@ -63,17 +63,18 @@ export default function ManualConnect({ onConnected, onBack }: Props) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  /* ── Yjs Doc & Provider ── */
+  /* ── Yjs Doc — 使用 ref 确保同步读写 ── */
+  const docRef = useRef<Y.Doc | null>(null)
   const [doc, setDoc] = useState<Y.Doc | null>(null)
+  const sync = useManualSync(docRef, roomKey)
 
-  // 只在需要时创建 provider（doc 为 null 时不创建）
-  const sync = useManualSync(doc, roomKey)
-
-  /* ── 创建 Y.Doc（同步创建，避免 setState 异步导致 provider 未就绪） ── */
+  /** 同步创建 Doc：直接写 ref.current + setState（触发重渲染） */
   function ensureDoc(): Y.Doc {
-    const d = new Y.Doc()
-    setDoc(d)
-    return d
+    if (!docRef.current) {
+      docRef.current = new Y.Doc()
+      setDoc(docRef.current)
+    }
+    return docRef.current
   }
 
   /* ── 监听连接状态 ── */
@@ -95,7 +96,7 @@ export default function ManualConnect({ onConnected, onBack }: Props) {
     setRole('offerer')
     setLoading(true)
 
-    // 先创建 Doc（通过 ref 同步可读，不依赖 React 重渲染）
+    // 先确保 doc 存在（直接写 ref，不依赖 React 重渲染）
     ensureDoc()
 
     try {
@@ -121,16 +122,15 @@ export default function ManualConnect({ onConnected, onBack }: Props) {
 
     try {
       await sync.acceptAnswer(remoteSdp.trim())
-      // synced 会通过 useEffect 自动触发 onConnected
     } catch (err) {
-      setError(err instanceof Error ? err.message : '连接失败，请检查粘贴的码是否正确')
+      setError(err instanceof Error ? err.message : '连接失败')
       setStep('error')
     } finally {
       setLoading(false)
     }
   }, [remoteSdp, sync])
 
-  /* ── 接收方：粘贴 offer 并生成 answer ── */
+  /* ── 接收方：粘贴 offer → 生成 answer ── */
   const handleAcceptOffer = useCallback(async () => {
     if (!remoteSdp.trim()) {
       setError('请先粘贴对方的连接码')
@@ -144,12 +144,15 @@ export default function ManualConnect({ onConnected, onBack }: Props) {
     setRole('answerer')
     setLoading(true)
 
+    // 先确保 doc 存在
+    ensureDoc()
+
     try {
       const answerSdp = await sync.acceptOffer(remoteSdp.trim())
       setLocalSdp(answerSdp)
       setStep('answer-ready')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '接受连接失败，请检查粘贴的码和房间码')
+      setError(err instanceof Error ? err.message : '接受连接失败')
       setStep('error')
     } finally {
       setLoading(false)
@@ -158,10 +161,9 @@ export default function ManualConnect({ onConnected, onBack }: Props) {
 
   /* ── 渲染 ── */
 
-  // 加载中
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 bg-[var(--bg-primary)]">
+      <div className="flex flex-col items-center justify-center gap-4 py-12">
         <Loader2 size={32} className="animate-spin text-[var(--accent)]" />
         <p className="text-sm text-[var(--text-secondary)]">
           {role === 'offerer' ? '正在建立连接...' : '正在处理...'}
@@ -171,160 +173,152 @@ export default function ManualConnect({ onConnected, onBack }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-full bg-[var(--bg-primary)] p-6">
-      <div className="w-full max-w-md">
-        {/* 标题 */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--accent-light)] mb-4">
-            <Wifi size={28} className="text-[var(--accent)]" />
-          </div>
-          <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-1">
-            局域网直连
-          </h2>
-          <p className="text-sm text-[var(--text-secondary)]">
-            零服务器 · 同 WiFi 直连 · 通过微信复制粘贴连接码
-          </p>
+    <div className="space-y-5">
+      {/* 返回按钮 */}
+      <button onClick={onBack} className="btn-icon">
+        <ArrowLeft size={20} />
+      </button>
+
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <Wifi size={18} className="text-[var(--accent)]" />
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">局域网直连</h3>
         </div>
+        <p className="text-xs text-[var(--text-tertiary)]">
+          零服务器 · 同 WiFi 直连 · 微信复制粘贴两段文字即连
+        </p>
+      </div>
 
-        {/* 错误提示 */}
-        {error && (
-          <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-red-50 text-red-600 text-sm">
-            <AlertCircle size={16} />
-            <span>{error}</span>
-          </div>
-        )}
+      {/* 错误提示 */}
+      {error && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm">
+          <AlertCircle size={16} />
+          <span>{error}</span>
+        </div>
+      )}
 
-        {/* Step 1: 输入房间码 */}
-        {step === 'init' && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                房间码（双方输入一致即可）
-              </label>
-              <input
-                type="text"
-                value={roomKey}
-                onChange={(e) => setRoomKey(e.target.value.toUpperCase())}
-                placeholder="例如：COFFEE"
-                maxLength={10}
-                className="w-full px-4 py-2.5 text-center text-lg tracking-[0.3em] font-mono
-                           bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg
-                           text-[var(--text-primary)] placeholder-[var(--text-tertiary)]
-                           focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-              />
-              <p className="text-xs text-[var(--text-tertiary)] mt-1.5 text-center">
-                这是防止同一 WiFi 下多组人互相干扰的密码
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={handleCreate}
-                disabled={!roomKey.trim()}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
-                           bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]
-                           disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-              >
-                <Link size={16} />
-                发起连接
-              </button>
-              <button
-                onClick={() => setStep('answer-input')}
-                disabled={!roomKey.trim()}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
-                           bg-[var(--bg-tertiary)] text-[var(--text-primary)]
-                           hover:bg-[var(--border)] disabled:opacity-40
-                           disabled:cursor-not-allowed transition-all"
-              >
-                <ArrowRightLeft size={16} />
-                接受连接
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step: 发起方 — Offer 已生成 */}
-        {step === 'offer-ready' && (
-          <div className="space-y-4">
-            <StepLabel num={1} text="复制这段连接码，发给对方" />
-            <CopyBox text={localSdp} copied={copiedOffer} onCopy={() => setCopiedOffer(true)} />
-
-            <StepLabel num={2} text="粘贴对方回传的连接码" />
-            <textarea
-              value={remoteSdp}
-              onChange={(e) => setRemoteSdp(e.target.value)}
-              placeholder="在这里粘贴对方回传的码..."
-              className="w-full h-20 px-3 py-2 text-xs font-mono
+      {/* Step: 输入房间码 + 选择角色 */}
+      {step === 'init' && (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              房间码（双方一致即可）
+            </label>
+            <input
+              type="text"
+              value={roomKey}
+              onChange={(e) => setRoomKey(e.target.value.toUpperCase())}
+              placeholder={presetKey || "例如：COFFEE"}
+              maxLength={10}
+              readOnly={!!presetKey}
+              className="w-full px-4 py-2.5 text-center text-lg tracking-[0.3em] font-mono
                          bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg
                          text-[var(--text-primary)] placeholder-[var(--text-tertiary)]
-                         focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
+                         focus:outline-none focus:ring-2 focus:ring-[var(--accent)]
+                         read-only:opacity-60"
             />
+            {presetKey && (
+              <p className="text-xs text-[var(--accent)] mt-1 text-center">使用房间码作为连接密钥</p>
+            )}
+          </div>
 
+          <div className="flex gap-3">
             <button
-              onClick={handleAcceptAnswer}
-              disabled={!remoteSdp.trim()}
-              className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white
-                         hover:bg-[var(--accent-hover)] disabled:opacity-40
-                         disabled:cursor-not-allowed transition-all"
+              onClick={handleCreate}
+              disabled={!roomKey.trim()}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
+                         bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]
+                         disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
-              完成连接
+              <Link size={16} />
+              发起连接
             </button>
-          </div>
-        )}
-
-        {/* Step: 发起方 — 连接完成 */}
-        {step === 'offer-done' && <ConnectedMessage />}
-
-        {/* Step: 接收方 — 粘贴 Offer */}
-        {step === 'answer-input' && (
-          <div className="space-y-4">
-            <StepLabel num={1} text="粘贴对方发来的连接码" />
-            <textarea
-              value={remoteSdp}
-              onChange={(e) => setRemoteSdp(e.target.value)}
-              placeholder="在这里粘贴对方发来的码..."
-              className="w-full h-24 px-3 py-2 text-xs font-mono
-                         bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg
-                         text-[var(--text-primary)] placeholder-[var(--text-tertiary)]
-                         focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
-            />
-
             <button
-              onClick={handleAcceptOffer}
-              disabled={!remoteSdp.trim()}
-              className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white
-                         hover:bg-[var(--accent-hover)] disabled:opacity-40
+              onClick={() => setStep('answer-input')}
+              disabled={!roomKey.trim()}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
+                         bg-[var(--bg-tertiary)] text-[var(--text-primary)]
+                         hover:bg-[var(--border)] disabled:opacity-40
                          disabled:cursor-not-allowed transition-all"
             >
+              <ArrowRightLeft size={16} />
               接受连接
             </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Step: 接收方 — Answer 已生成 */}
-        {step === 'answer-ready' && (
-          <div className="space-y-4">
-            <StepLabel num={2} text="复制这段回传码，发给对方" />
-            <CopyBox text={localSdp} copied={copiedAnswer} onCopy={() => setCopiedAnswer(true)} />
-            <p className="text-xs text-[var(--text-tertiary)] text-center">
-              等待对方粘贴你的回传码后，连接即建立
-            </p>
-          </div>
-        )}
+      {/* 发起方：Offer 已生成 */}
+      {step === 'offer-ready' && (
+        <div className="space-y-4">
+          <StepLabel num={1} text="复制这段连接码，微信发给对方" />
+          <CopyBox text={localSdp} copied={copiedOffer} onCopy={() => setCopiedOffer(true)} />
 
-        {/* Step: 接收方 — 连接完成 */}
-        {step === 'answer-done' && <ConnectedMessage />}
+          <StepLabel num={2} text="粘贴对方回传的连接码" />
+          <textarea
+            value={remoteSdp}
+            onChange={(e) => setRemoteSdp(e.target.value)}
+            placeholder="在这里粘贴..."
+            className="w-full h-20 px-3 py-2 text-xs font-mono
+                       bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg
+                       text-[var(--text-primary)] placeholder-[var(--text-tertiary)]
+                       focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
+          />
 
-        {/* 返回按钮 */}
-        <div className="mt-6 text-center">
           <button
-            onClick={onBack}
-            className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+            onClick={handleAcceptAnswer}
+            disabled={!remoteSdp.trim()}
+            className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white
+                       hover:bg-[var(--accent-hover)] disabled:opacity-40
+                       disabled:cursor-not-allowed transition-all"
           >
-            返回首页
+            完成连接
           </button>
         </div>
-      </div>
+      )}
+
+      {/* 发起方：连接完成 */}
+      {step === 'offer-done' && <ConnectedMessage />}
+
+      {/* 接收方：粘贴 Offer */}
+      {step === 'answer-input' && (
+        <div className="space-y-4">
+          <StepLabel num={1} text="粘贴对方发来的连接码" />
+          <textarea
+            value={remoteSdp}
+            onChange={(e) => setRemoteSdp(e.target.value)}
+            placeholder="在这里粘贴..."
+            className="w-full h-24 px-3 py-2 text-xs font-mono
+                       bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg
+                       text-[var(--text-primary)] placeholder-[var(--text-tertiary)]
+                       focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
+          />
+
+          <button
+            onClick={handleAcceptOffer}
+            disabled={!remoteSdp.trim()}
+            className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white
+                       hover:bg-[var(--accent-hover)] disabled:opacity-40
+                       disabled:cursor-not-allowed transition-all"
+          >
+            接受连接
+          </button>
+        </div>
+      )}
+
+      {/* 接收方：Answer 已生成 */}
+      {step === 'answer-ready' && (
+        <div className="space-y-4">
+          <StepLabel num={2} text="复制这段回传码，微信发给对方" />
+          <CopyBox text={localSdp} copied={copiedAnswer} onCopy={() => setCopiedAnswer(true)} />
+          <p className="text-xs text-[var(--text-tertiary)] text-center">
+            等待对方粘贴你的回传码后，连接即建立
+          </p>
+        </div>
+      )}
+
+      {/* 接收方：连接完成 */}
+      {step === 'answer-done' && <ConnectedMessage />}
     </div>
   )
 }
