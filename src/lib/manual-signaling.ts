@@ -475,11 +475,19 @@ export class ManualSignalingProvider extends Observable<string> {
   private setupDataChannel(channel: RTCDataChannel): void {
     channel.binaryType = 'arraybuffer'
 
-    channel.onopen = () => {
+    const onOpen = () => {
       console.log('[ManualSignaling] DataChannel opened')
       this._synced = true
       this.syncStep1() // 发送初始状态
       this.emit('synced', [{ synced: true }])
+    }
+
+    // 关键：ondatachannel 触发时，channel 可能已经 open（ICE 先于 DC 完成）
+    // 如果 readyState 已经是 open，onopen 不会再触发，需要直接初始化
+    if (channel.readyState === 'open') {
+      onOpen()
+    } else {
+      channel.onopen = onOpen
     }
 
     channel.onclose = () => {
