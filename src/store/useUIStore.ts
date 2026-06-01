@@ -109,7 +109,7 @@ export const useUIStore = create<UIState>((set) => ({
 
   setMobileView: (view) => set({ mobileView: view }),
 
-  setConnectedPeers: (count) => set({ connectedPeers: count, peerConnecting: false }),
+  setConnectedPeers: (count) => set({ connectedPeers: count, peerConnecting: count === 0 }),
   setPeerConnecting: (connecting) => set({ peerConnecting: connecting }),
   setCanvasScale: (scale) => set({ canvasScale: scale }),
 }))

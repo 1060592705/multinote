@@ -103,8 +103,13 @@ export function useYjsSync(roomCode: string, userId: string) {
       pm.set('updatedAt', Date.now())
       pm.set('thumbnail', page.thumbnail)
 
-      // blocks
-      const blocks = new Y.Array<Y.Map<unknown>>()
+      // blocks — 增量更新：复用已有 Y.Array，只做删/增，不重建
+      let blocks = pm.get('blocks') as Y.Array<Y.Map<unknown>> | undefined
+      if (!blocks) {
+        blocks = new Y.Array<Y.Map<unknown>>()
+        pm.set('blocks', blocks)
+      }
+      blocks.delete(0, blocks.length)
       blocks.push(page.blocks.map((b) => {
         const bm = new Y.Map<unknown>()
         bm.set('id', b.id); bm.set('type', b.type)
@@ -113,10 +118,14 @@ export function useYjsSync(roomCode: string, userId: string) {
         bm.set('createdAt', b.createdAt); bm.set('updatedAt', b.updatedAt)
         return bm
       }))
-      pm.set('blocks', blocks)
 
-      // pageHandwriting
-      const phw = new Y.Array<Y.Map<unknown>>()
+      // pageHandwriting — 增量更新：复用已有 Y.Array
+      let phw = pm.get('pageHandwriting') as Y.Array<Y.Map<unknown>> | undefined
+      if (!phw) {
+        phw = new Y.Array<Y.Map<unknown>>()
+        pm.set('pageHandwriting', phw)
+      }
+      phw.delete(0, phw.length)
       phw.push(page.pageHandwriting.map((s) => {
         const sm = new Y.Map<unknown>()
         sm.set('id', s.id); sm.set('points', s.points)
@@ -125,13 +134,12 @@ export function useYjsSync(roomCode: string, userId: string) {
         sm.set('authorId', s.authorId)
         return sm
       }))
-      pm.set('pageHandwriting', phw)
 
       // 注意：不设置 doodleLayers — 保持 Yjs 中已有的值
     })
   }, [myNotebook, userId])
 
-  /* ── 对方笔记本变化 ← Yjs ── */
+  /* ── Yjs 变化 → Zustand（朋友笔记本 + 自己页面上的涂鸦，合并到单个 observeDeep） ── */
   const setFriendNotebook = useNotebookStore((s) => s.setFriendNotebook)
   const setPeerStatus = useNotebookStore((s) => s.setPeerStatus)
 
@@ -142,6 +150,7 @@ export function useYjsSync(roomCode: string, userId: string) {
     const notebooks = sync.doc.getMap('notebooks')
 
     const handler = () => {
+      // 1. 同步朋友笔记本（非自身 user 的 notebook）
       notebooks.forEach((_nbMap, key) => {
         if (key === userId) return
 
@@ -169,6 +178,46 @@ export function useYjsSync(roomCode: string, userId: string) {
           setFriendNotebook(friendNb)
         }
       })
+
+      // 2. 同步自己页面上的朋友涂鸦（doodleLayers）
+      const nbMap = notebooks.get(userId) as Y.Map<unknown> | undefined
+      if (nbMap) {
+        const pages = nbMap.get('pages') as Y.Array<Y.Map<unknown>> | undefined
+        if (pages) {
+          const state = useNotebookStore.getState()
+          const myPages = state.myNotebook.pages
+
+          let doodleChanged = false
+          const newPages = myPages.map((page, idx) => {
+            if (idx >= pages.length) return page
+            const yPage = pages.get(idx)
+            const yDoodles = yPage.get('doodleLayers') as Y.Array<Y.Map<unknown>> | undefined
+            if (!yDoodles) return page
+
+            const doodleLayers: DoodleLayer[] = yDoodles.toArray().map((dm) => ({
+              id: (dm.get('id') as string) || '',
+              pageId: (dm.get('pageId') as string) || '',
+              blockId: (dm.get('blockId') as string) || null,
+              authorId: (dm.get('authorId') as string) || '',
+              strokes: (dm.get('strokes') as DoodleLayer['strokes']) || [],
+              createdAt: (dm.get('createdAt') as number) || Date.now(),
+              updatedAt: (dm.get('updatedAt') as number) || Date.now(),
+            }))
+
+            if (doodleLayers.length !== page.doodleLayers.length) {
+              doodleChanged = true
+              return { ...page, doodleLayers }
+            }
+            return page
+          })
+
+          if (doodleChanged) {
+            useNotebookStore.setState({
+              myNotebook: { ...state.myNotebook, pages: newPages }
+            })
+          }
+        }
+      }
     }
 
     notebooks.observeDeep(handler)
@@ -179,72 +228,18 @@ export function useYjsSync(roomCode: string, userId: string) {
     }
   }, [userId, setFriendNotebook])
 
-  /* ── 朋友在我页面上的涂鸦 ← Yjs（读回我自己 notebook 的 doodleLayers） ── */
-  useEffect(() => {
-    const sync = syncRef.current
-    if (!sync) return
-
-    const notebooks = sync.doc.getMap('notebooks')
-
-    const handler = () => {
-      const nbMap = notebooks.get(userId) as Y.Map<unknown> | undefined
-      if (!nbMap) return
-
-      const pages = nbMap.get('pages') as Y.Array<Y.Map<unknown>> | undefined
-      if (!pages) return
-
-      const state = useNotebookStore.getState()
-      const myPages = state.myNotebook.pages
-
-      // 只同步 doodleLayers（朋友画的涂鸦）
-      let changed = false
-      const newPages = myPages.map((page, idx) => {
-        if (idx >= pages.length) return page
-        const yPage = pages.get(idx)
-        const yDoodles = yPage.get('doodleLayers') as Y.Array<Y.Map<unknown>> | undefined
-        if (!yDoodles) return page
-
-        const doodleLayers: DoodleLayer[] = yDoodles.toArray().map((dm) => ({
-          id: (dm.get('id') as string) || '',
-          pageId: (dm.get('pageId') as string) || '',
-          blockId: (dm.get('blockId') as string) || null,
-          authorId: (dm.get('authorId') as string) || '',
-          strokes: (dm.get('strokes') as DoodleLayer['strokes']) || [],
-          createdAt: (dm.get('createdAt') as number) || Date.now(),
-          updatedAt: (dm.get('updatedAt') as number) || Date.now(),
-        }))
-
-        // 简单对比：数量变化即更新
-        if (doodleLayers.length !== page.doodleLayers.length) {
-          changed = true
-          return { ...page, doodleLayers }
-        }
-        return page
-      })
-
-      if (changed) {
-        useNotebookStore.setState({
-          myNotebook: { ...state.myNotebook, pages: newPages }
-        })
-      }
-    }
-
-    notebooks.observeDeep(handler)
-
-    return () => {
-      notebooks.unobserveDeep(handler)
-    }
-  }, [userId])
-
   /* ── Peer awareness ── */
   useEffect(() => {
     const sync = syncRef.current
     if (!sync) return
 
+    // 捕获本地引用，避免清理时 syncRef.current 已被 init cleanup 设为 null
+    const captured = sync
+
     const updatePeer = () => {
-      const states = sync.provider.awareness.getStates()
+      const states = captured.provider.awareness.getStates()
       states.forEach((state, clientId) => {
-        if (sync.provider.awareness.clientID === clientId) return
+        if (captured.provider.awareness.clientID === clientId) return
         const s = state as Record<string, unknown> | undefined
         if (s && s.userId && s.userId !== userId) {
           setPeerStatus({
@@ -257,17 +252,17 @@ export function useYjsSync(roomCode: string, userId: string) {
       })
     }
 
-    sync.provider.awareness.on('change', updatePeer)
+    captured.provider.awareness.on('change', updatePeer)
     updatePeer()
 
     const interval = setInterval(() => {
-      sync.provider.awareness.setLocalStateField('currentPageIndex',
+      captured.provider.awareness.setLocalStateField('currentPageIndex',
         useNotebookStore.getState().myNotebook.currentPageIndex
       )
     }, 3000)
 
     return () => {
-      sync.provider.awareness.off('change', updatePeer)
+      captured.provider.awareness.off('change', updatePeer)
       clearInterval(interval)
     }
   }, [userId, setPeerStatus])

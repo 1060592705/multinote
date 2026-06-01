@@ -13,8 +13,6 @@ export default function Sidebar() {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const expandedNotebooks = useUIStore((s) => s.expandedNotebooks)
   const toggleNotebook = useUIStore((s) => s.toggleNotebook)
-  const expandedPages = useUIStore((s) => s.expandedPages)
-  const togglePage = useUIStore((s) => s.togglePage)
   const isDoodleMode = useToolStore((s) => s.isDoodleMode)
   const editMode = useToolStore((s) => s.editMode)
 
@@ -80,9 +78,7 @@ export default function Sidebar() {
             label="朋友的笔记本"
             isFriend={true}
             expanded={expandedNotebooks.has(friendNotebook?.id || '')}
-            expandedPages={expandedPages}
             onToggleNotebook={() => friendNotebook && toggleNotebook(friendNotebook.id)}
-            onTogglePage={togglePage}
             onGoToPage={(idx) => friendNotebook && viewFriendPage(idx)}
           />
 
@@ -95,9 +91,7 @@ export default function Sidebar() {
             label="我的笔记本"
             isFriend={false}
             expanded={expandedNotebooks.has(myNotebook.id)}
-            expandedPages={expandedPages}
             onToggleNotebook={() => toggleNotebook(myNotebook.id)}
-            onTogglePage={togglePage}
             onGoToPage={goToMyPage}
           />
 
@@ -124,18 +118,14 @@ function NotebookTreeNode({
   label,
   isFriend,
   expanded,
-  expandedPages: _expandedPages,
   onToggleNotebook,
-  onTogglePage: _onTogglePage,
   onGoToPage,
 }: {
   notebook: { id: string; name: string; pages: { id: string; pageNumber: number }[] } | null
   label: string
   isFriend: boolean
   expanded: boolean
-  expandedPages: Set<string>
   onToggleNotebook: () => void
-  onTogglePage: (pageId: string) => void
   onGoToPage: (pageIndex: number) => void
 }) {
   const [hoveredPageId, setHoveredPageId] = useState<string | null>(null)
