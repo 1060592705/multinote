@@ -7,8 +7,8 @@
 
 import { create } from 'zustand'
 import type { Notebook, Page, Block, DoodleLayer, HandwritingData, PeerStatus } from '../types'
-import { generateUserId } from '../lib/room'
-import { getGlobalSync, addDoodleToDoc } from '../lib/yjs'
+import { generateUserId } from '../net/room'
+import { getGlobalSync, addDoodleToDoc } from '../sync/yjs-doc'
 
 /* ── 常量 ── */
 

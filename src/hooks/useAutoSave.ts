@@ -6,9 +6,9 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { useNotebookStore } from '../store/useNotebookStore'
-import { saveNotebook, loadNotebook } from '../lib/storage'
-import { AUTO_SAVE_DELAY } from '../lib/constants'
+import { useNotebookStore } from '../state/notebook'
+import { saveNotebook, loadNotebook } from '../storage/db'
+import { AUTO_SAVE_DELAY } from '../constants'
 
 export function useAutoSave(userId: string) {
   const myNotebook = useNotebookStore((s) => s.myNotebook)

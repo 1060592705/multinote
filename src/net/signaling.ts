@@ -9,7 +9,7 @@
 
 import * as Y from 'yjs'
 import { Observable } from 'lib0/observable'
-import { ICE_SERVERS } from './constants'
+import { ICE_SERVERS } from '../constants'
 
 /* ═══════════════════════════════════════════
    常量

@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useUIStore } from '../store/useUIStore'
+import { useUIStore } from '../state/ui'
 
 /* ── 常量 ── */
 export const LOGICAL_WIDTH_DUAL = 1464  // 720×2 + 24 缝隙

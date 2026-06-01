@@ -8,11 +8,11 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Pen, Circle, Highlighter, Eraser, Undo2, Redo2, Pencil, Keyboard, Eye, EyeOff, PanelLeftOpen, PanelLeftClose, ZoomIn, RotateCcw } from 'lucide-react'
-import { useToolStore } from '../../store/useToolStore'
-import { useNotebookStore } from '../../store/useNotebookStore'
-import { useUIStore } from '../../store/useUIStore'
-import { COLOR_PRESETS, MIN_BRUSH_SIZE, MAX_BRUSH_SIZE } from '../../lib/constants'
-import type { BrushType } from '../../lib/constants'
+import { useToolStore } from '../../state/tool'
+import { useNotebookStore } from '../../state/notebook'
+import { useUIStore } from '../../state/ui'
+import { COLOR_PRESETS, MIN_BRUSH_SIZE, MAX_BRUSH_SIZE } from '../../constants'
+import type { BrushType } from '../../constants'
 import AddBlockButton from '../toolbar/AddBlockButton'
 
 /* ── 笔刷按钮定义 ── */

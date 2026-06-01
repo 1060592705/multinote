@@ -5,7 +5,7 @@
  */
 
 import type { Stroke, Point } from '../types'
-import { PRESSURE_VARIANCE, MIN_BRUSH_SIZE } from './constants'
+import { PRESSURE_VARIANCE, MIN_BRUSH_SIZE } from '../constants'
 
 /* ═══════════════════════════════════════════
    平滑处理

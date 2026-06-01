@@ -7,8 +7,8 @@
 
 import { useRef, useCallback } from 'react'
 import type { Point, Stroke } from '../types'
-import type { BrushType } from '../lib/constants'
-import { useUIStore } from '../store/useUIStore'
+import type { BrushType } from '../constants'
+import { useUIStore } from '../state/ui'
 
 /* ── 类型 ── */
 

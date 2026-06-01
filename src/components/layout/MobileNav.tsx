@@ -5,9 +5,9 @@
  */
 
 import { User, Users, Pen } from 'lucide-react'
-import { useUIStore } from '../../store/useUIStore'
-import { useToolStore } from '../../store/useToolStore'
-import { MOBILE_NAV_HEIGHT } from '../../lib/constants'
+import { useUIStore } from '../../state/ui'
+import { useToolStore } from '../../state/tool'
+import { MOBILE_NAV_HEIGHT } from '../../constants'
 
 export default function MobileNav() {
   const mobileView = useUIStore((s) => s.mobileView)

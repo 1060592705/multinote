@@ -4,7 +4,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Plus } from 'lucide-react'
-import type { BlockType } from '../../lib/constants'
+import type { BlockType } from '../../constants'
 import type { Block } from '../../types'
 
 type Props = {

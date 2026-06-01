@@ -11,12 +11,12 @@
 
 import { useEffect, useRef } from 'react'
 import * as Y from 'yjs'
-import { useNotebookStore } from '../store/useNotebookStore'
-import { useUIStore } from '../store/useUIStore'
-import { initYjsSync, readNotebookFromDoc, ensureNotebookInDoc, setGlobalSync } from '../lib/yjs'
-import type { YjsSync } from '../lib/yjs'
+import { useNotebookStore } from '../state/notebook'
+import { useUIStore } from '../state/ui'
+import { initYjsSync, readNotebookFromDoc, ensureNotebookInDoc, setGlobalSync } from '../sync/yjs-doc'
+import type { YjsSync } from '../sync/yjs-doc'
 import type { Notebook, DoodleLayer } from '../types'
-import { CONNECTION_TIMEOUT } from '../lib/constants'
+import { CONNECTION_TIMEOUT } from '../constants'
 
 /** 跟踪 peer 数量（通过 'peers' 事件更新，避免访问 y-webrtc 内部 API） */
 

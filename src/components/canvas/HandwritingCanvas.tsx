@@ -14,10 +14,10 @@
 
 import { useRef, useEffect, useCallback } from 'react'
 import type { Stroke, HandwritingData, Point } from '../../types'
-import { useToolStore } from '../../store/useToolStore'
-import { useNotebookStore } from '../../store/useNotebookStore'
+import { useToolStore } from '../../state/tool'
+import { useNotebookStore } from '../../state/notebook'
 import { usePointerHandler } from '../../hooks/usePointerHandler'
-import { renderStroke, renderStrokes, hitTestStroke, hitTestStrokeLine } from '../../lib/brush-engine'
+import { renderStroke, renderStrokes, hitTestStroke, hitTestStrokeLine } from '../../engine/brush'
 
 type Props = {
   blockId: string

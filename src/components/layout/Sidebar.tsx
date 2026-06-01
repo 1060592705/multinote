@@ -3,10 +3,10 @@ import {
   PanelLeftClose, PanelLeft, ChevronRight,
   FileText, Plus, Trash2
 } from 'lucide-react'
-import { useNotebookStore } from '../../store/useNotebookStore'
-import { useUIStore } from '../../store/useUIStore'
-import { useToolStore } from '../../store/useToolStore'
-import { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '../../lib/constants'
+import { useNotebookStore } from '../../state/notebook'
+import { useUIStore } from '../../state/ui'
+import { useToolStore } from '../../state/tool'
+import { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '../../constants'
 
 export default function Sidebar() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen)

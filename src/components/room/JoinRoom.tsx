@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowLeft, LogIn } from 'lucide-react'
 import type { RoomState } from '../../App'
-import { generateUserId } from '../../lib/room'
+import { generateUserId } from '../../net/room'
 
 type Props = {
   onJoin: (room: RoomState) => void

@@ -3,7 +3,7 @@
  */
 
 import { Plus, Trash2, GripVertical } from 'lucide-react'
-import type { BlockType } from '../../lib/constants'
+import type { BlockType } from '../../constants'
 
 type Props = {
   onAdd: (type: BlockType) => void

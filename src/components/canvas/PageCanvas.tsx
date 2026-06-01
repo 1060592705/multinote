@@ -6,9 +6,9 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react'
 import type { Page, Block, BlockContent } from '../../types'
-import { PAGE_WIDTH, PAGE_PX, PAGE_PY, PAGE_MIN_HEIGHT } from '../../lib/constants'
-import { useNotebookStore } from '../../store/useNotebookStore'
-import { useToolStore } from '../../store/useToolStore'
+import { PAGE_WIDTH, PAGE_PX, PAGE_PY, PAGE_MIN_HEIGHT } from '../../constants'
+import { useNotebookStore } from '../../state/notebook'
+import { useToolStore } from '../../state/tool'
 import HandwritingCanvas from './HandwritingCanvas'
 import BlockItem from './BlockItem'
 import EmptyPageHint from './EmptyPageHint'

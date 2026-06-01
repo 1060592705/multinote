@@ -15,7 +15,7 @@ import {
   ManualSignalingProvider,
   attachDocSync,
   type ConnectionState,
-} from '../lib/manual-signaling'
+} from '../net/signaling'
 
 export interface UseManualSyncReturn {
   state: ConnectionState

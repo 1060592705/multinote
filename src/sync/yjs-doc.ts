@@ -11,7 +11,7 @@ import * as Y from 'yjs'
 import { WebrtcProvider } from 'y-webrtc'
 import type { Block, DoodleLayer, HandwritingData, Stroke } from '../types'
 import type { BlockContent } from '../types'
-import { SIGNALING_SERVERS, ICE_SERVERS } from './constants'
+import { SIGNALING_SERVERS, ICE_SERVERS } from '../constants'
 
 /* ═══════════════════════════════════════════
    Yjs → JSON 读取

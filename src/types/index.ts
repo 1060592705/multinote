@@ -2,7 +2,7 @@
  * MultiNote 核心类型定义
  */
 
-import type { BlockType, BrushType } from '../lib/constants'
+import type { BlockType, BrushType } from '../constants'
 
 /* ═══════════════════════════════════════════
    笔记本 & 页面

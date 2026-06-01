@@ -6,12 +6,12 @@ import Toolbar from './components/layout/Toolbar'
 import DualPane from './components/layout/DualPane'
 import CanvasScaler from './components/layout/CanvasScaler'
 import MobileNav from './components/layout/MobileNav'
-import { useUIStore } from './store/useUIStore'
+import { useUIStore } from './state/ui'
 import { useYjsSync } from './hooks/useYjsSync'
 import { useLanSync } from './hooks/useLanSync'
 import { useAutoSave } from './hooks/useAutoSave'
 import { useCanvasScale } from './hooks/useCanvasScale'
-import { getRoomFromURL, generateUserId } from './lib/room'
+import { getRoomFromURL, generateUserId } from './net/room'
 
 export type RoomState = {
   roomCode: string

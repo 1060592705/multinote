@@ -9,13 +9,13 @@
 
 import { useEffect, useRef } from 'react'
 import * as Y from 'yjs'
-import { useNotebookStore } from '../store/useNotebookStore'
+import { useNotebookStore } from '../state/notebook'
 import {
   readNotebookFromDoc,
   ensureNotebookInDoc,
   setGlobalSync,
-} from '../lib/yjs'
-import type { YjsSync } from '../lib/yjs'
+} from '../sync/yjs-doc'
+import type { YjsSync } from '../sync/yjs-doc'
 import type { Notebook, DoodleLayer } from '../types'
 
 /* ── 轻量 YjsSync（无 WebRTC） ── */

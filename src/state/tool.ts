@@ -5,8 +5,8 @@
  */
 
 import { create } from 'zustand'
-import type { BrushType } from '../lib/constants'
-import { DEFAULT_BRUSH_COLOR, DEFAULT_BRUSH_SIZE } from '../lib/constants'
+import type { BrushType } from '../constants'
+import { DEFAULT_BRUSH_COLOR, DEFAULT_BRUSH_SIZE } from '../constants'
 
 interface ToolState {
   /* 当前工具 */

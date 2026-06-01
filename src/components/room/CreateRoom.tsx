@@ -2,7 +2,7 @@ import { useState } from 'react'
 import * as Y from 'yjs'
 import { ArrowLeft, Copy, Check, Wifi } from 'lucide-react'
 import type { RoomState } from '../../App'
-import { generateRoomCode, generateUserId } from '../../lib/room'
+import { generateRoomCode, generateUserId } from '../../net/room'
 import ManualConnect from './ManualConnect'
 
 type Props = {
