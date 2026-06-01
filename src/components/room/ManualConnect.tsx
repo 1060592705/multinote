@@ -137,6 +137,26 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
     }
   }, [roomKey, sync, loading])
 
+  /* ── 恢复：连接状态异常时重新生成 offer ── */
+  const handleRetry = useCallback(async () => {
+    if (loading || lockRef.current) return
+    setError('')
+    setLoading(true)
+    lockRef.current = true
+
+    try {
+      const sdp = await sync.createOffer()
+      setLocalSdp(sdp)
+      setRemoteSdp('') // 清空旧 answer
+      setStep('offer-ready')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '重新发起失败')
+    } finally {
+      setLoading(false)
+      lockRef.current = false
+    }
+  }, [sync, loading])
+
   /* ── 发起方：粘贴 answer 完成连接 ── */
   const handleAcceptAnswer = useCallback(async () => {
     if (loading || lockRef.current) return
@@ -227,9 +247,23 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
 
       {/* 错误提示 */}
       {error && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm">
-          <AlertCircle size={16} />
-          <span>{error}</span>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm">
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+          {/* 连接状态异常时可一键重新发起 */}
+          {error.includes('连接状态异常') && (
+            <button
+              onClick={handleRetry}
+              disabled={loading}
+              className="w-full py-2 rounded-lg bg-[var(--accent)] text-white text-sm
+                         hover:bg-[var(--accent-hover)] disabled:opacity-40
+                         disabled:cursor-not-allowed transition-all"
+            >
+              重新发起连接
+            </button>
+          )}
         </div>
       )}
 

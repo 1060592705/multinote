@@ -26,6 +26,8 @@ function generateConnectionId(): string {
   return `conn-${++_connectionIdCounter}-${Math.random().toString(36).slice(2, 6)}`
 }
 
+let _providerIdCounter = 0
+
 /* ═══════════════════════════════════════════
    SDP 序列化 & 压缩
    ═══════════════════════════════════════════ */
@@ -177,6 +179,8 @@ export class ManualSignalingProvider extends Observable<string> {
   private _synced: boolean = false
   private _disposed: boolean = false
   private _creatingOffer: boolean = false
+  private _providerId: number
+  private _offerSeq: number = 0
 
   /** ICE 收集超时定时器 */
   private _iceTimer: ReturnType<typeof setTimeout> | null = null
@@ -192,6 +196,8 @@ export class ManualSignalingProvider extends Observable<string> {
     this.doc = doc
     this.roomKey = roomKey
     this.connId = generateConnectionId()
+    this._providerId = ++_providerIdCounter
+    console.log(`[MS#${this._providerId}] Provider created | roomKey=${roomKey} | connId=${this.connId}`)
   }
 
   /* ═══════════════════════════════════════════
@@ -212,6 +218,9 @@ export class ManualSignalingProvider extends Observable<string> {
     if (this._disposed) throw new Error('Provider disposed')
     if (this._creatingOffer) throw new Error('正在创建连接，请稍候...')
     this._creatingOffer = true
+    this._offerSeq++
+    const seq = this._offerSeq
+    console.log(`[MS#${this._providerId}] createOffer() #${seq} start | existingPc=${!!this.pc}`)
     this.setState({ role: 'offerer', status: 'gathering' })
 
     const pc = this.createPeerConnection()
@@ -229,10 +238,12 @@ export class ManualSignalingProvider extends Observable<string> {
 
       // 等待 ICE 候选收集完成
       const packed = await this.waitForIceComplete(pc)
+      console.log(`[MS#${this._providerId}] createOffer() #${seq} done | signalingState=${this.pc?.signalingState} | sdpLen=${packed.length}`)
       this.setState({ status: 'ready', localSdp: packed })
       return packed
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[MS#${this._providerId}] createOffer() #${seq} FAILED:`, msg)
       this.setState({ status: 'error', error: msg })
       throw err
     } finally {
@@ -295,11 +306,23 @@ export class ManualSignalingProvider extends Observable<string> {
     if (this._disposed) throw new Error('Provider disposed')
     if (!this.pc) throw new Error('尚未创建连接，请先调用 createOffer()')
 
+    // 详细诊断
+    const sigState = this.pc.signalingState
+    const connState = this.pc.connectionState
+    const iceState = this.pc.iceConnectionState
+    const hasLocal = !!this.pc.localDescription
+    const hasRemote = !!this.pc.remoteDescription
+    console.log(
+      `[MS#${this._providerId}] acceptAnswer() called | ` +
+      `signalingState=${sigState} connectionState=${connState} iceState=${iceState} | ` +
+      `hasLocal=${hasLocal} hasRemote=${hasRemote} | ` +
+      `_creatingOffer=${this._creatingOffer} _disposed=${this._disposed}`
+    )
+
     // 信令状态守卫：pc 必须处于 have-local-offer 状态才能接受 answer
-    // 如果被并发 createOffer() 重置了 pc，signalingState 会是 stable → 报清晰错误
-    if (this.pc.signalingState !== 'have-local-offer') {
+    if (sigState !== 'have-local-offer') {
       throw new Error(
-        `连接状态异常 (${this.pc.signalingState})，请点击"发起连接"重新生成连接码`
+        `连接状态异常 (${sigState})，请点击"发起连接"重新生成连接码`
       )
     }
 
@@ -323,6 +346,7 @@ export class ManualSignalingProvider extends Observable<string> {
 
   /** 断开连接并清理资源 */
   destroy(): void {
+    console.log(`[MS#${this._providerId}] destroy() | signalingState=${this.pc?.signalingState} | synced=${this._synced}`)
     this._disposed = true
     this._synced = false
 
@@ -352,7 +376,9 @@ export class ManualSignalingProvider extends Observable<string> {
 
   /** 创建 RTCPeerConnection（纯局域网，无 STUN/TURN） */
   private createPeerConnection(): RTCPeerConnection {
+    const oldSignaling = this.pc?.signalingState ?? 'none'
     if (this.pc) {
+      console.log(`[MS#${this._providerId}] Closing old pc (signalingState=${oldSignaling})`)
       this.pc.close()
     }
 
@@ -360,10 +386,16 @@ export class ManualSignalingProvider extends Observable<string> {
       // 不配置 iceServers —— 纯局域网 mDNS 直连，不依赖任何外部服务器
       iceServers: [],
     })
+    console.log(`[MS#${this._providerId}] New RTCPeerConnection created | signalingState=stable`)
+
+    this.pc.onsignalingstatechange = () => {
+      console.log(`[MS#${this._providerId}] signalingState → ${this.pc?.signalingState}`)
+    }
 
     this.pc.onconnectionstatechange = () => {
       if (!this.pc) return
       const state = this.pc.connectionState
+      console.log(`[MS#${this._providerId}] connectionState → ${state}`)
       if (state === 'connected') {
         this.setState({ status: 'connected' })
         this.emit('connect', [])
@@ -375,8 +407,7 @@ export class ManualSignalingProvider extends Observable<string> {
     }
 
     this.pc.oniceconnectionstatechange = () => {
-      // ICE 连接状态变化时记录，用于调试
-      console.log('[ManualSignaling] ICE state:', this.pc?.iceConnectionState)
+      console.log(`[MS#${this._providerId}] iceConnectionState → ${this.pc?.iceConnectionState}`)
     }
 
     return this.pc
