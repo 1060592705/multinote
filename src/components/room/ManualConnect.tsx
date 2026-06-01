@@ -75,6 +75,9 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  /* ── 同步锁：ref 立即生效，防止 tap/click 事件竞态绕过 loading state ── */
+  const lockRef = useRef(false)
+
   /* ── Yjs Doc — 使用 ref 确保同步读写 ── */
   const docRef = useRef<Y.Doc | null>(null)
   const [doc, setDoc] = useState<Y.Doc | null>(null)
@@ -108,7 +111,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
 
   /* ── 发起方：创建连接 ── */
   const handleCreate = useCallback(async () => {
-    if (loading) return
+    if (loading || lockRef.current) return
     if (!roomKey.trim()) {
       setError('请先输入房间码')
       return
@@ -116,6 +119,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
     setError('')
     setRole('offerer')
     setLoading(true)
+    lockRef.current = true
 
     // 先确保 doc 存在（直接写 ref，不依赖 React 重渲染）
     ensureDoc()
@@ -129,18 +133,20 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
       setStep('error')
     } finally {
       setLoading(false)
+      lockRef.current = false
     }
   }, [roomKey, sync, loading])
 
   /* ── 发起方：粘贴 answer 完成连接 ── */
   const handleAcceptAnswer = useCallback(async () => {
-    if (loading) return
+    if (loading || lockRef.current) return
     if (!remoteSdp.trim()) {
       setError('请先粘贴对方回传的连接码')
       return
     }
     setError('')
     setLoading(true)
+    lockRef.current = true
     ensureDoc()
 
     try {
@@ -150,12 +156,13 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
       setStep('error')
     } finally {
       setLoading(false)
+      lockRef.current = false
     }
   }, [remoteSdp, sync, loading])
 
   /* ── 接收方：粘贴 offer → 生成 answer ── */
   const handleAcceptOffer = useCallback(async () => {
-    if (loading) return
+    if (loading || lockRef.current) return
     if (!remoteSdp.trim()) {
       setError('请先粘贴对方的连接码')
       return
@@ -167,6 +174,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
     setError('')
     setRole('answerer')
     setLoading(true)
+    lockRef.current = true
 
     // 先确保 doc 存在
     ensureDoc()
@@ -180,6 +188,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey, defaultR
       setStep('error')
     } finally {
       setLoading(false)
+      lockRef.current = false
     }
   }, [remoteSdp, roomKey, sync, loading])
 

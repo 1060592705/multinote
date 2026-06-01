@@ -110,6 +110,7 @@ export class ManualSignalingProvider extends Observable<string> {
   private dc: RTCDataChannel | null = null
   private _synced: boolean = false
   private _disposed: boolean = false
+  private _creatingOffer: boolean = false
 
   /** ICE 收集超时定时器 */
   private _iceTimer: ReturnType<typeof setTimeout> | null = null
@@ -143,6 +144,8 @@ export class ManualSignalingProvider extends Observable<string> {
    */
   async createOffer(): Promise<string> {
     if (this._disposed) throw new Error('Provider disposed')
+    if (this._creatingOffer) throw new Error('正在创建连接，请稍候...')
+    this._creatingOffer = true
     this.setState({ role: 'offerer', status: 'gathering' })
 
     const pc = this.createPeerConnection()
@@ -166,6 +169,8 @@ export class ManualSignalingProvider extends Observable<string> {
       const msg = err instanceof Error ? err.message : String(err)
       this.setState({ status: 'error', error: msg })
       throw err
+    } finally {
+      this._creatingOffer = false
     }
   }
 
@@ -175,6 +180,8 @@ export class ManualSignalingProvider extends Observable<string> {
    */
   async acceptOffer(packedSdp: string): Promise<string> {
     if (this._disposed) throw new Error('Provider disposed')
+    if (this._creatingOffer) throw new Error('正在处理连接，请稍候...')
+    this._creatingOffer = true
 
     const unpacked = unpackSdp(packedSdp)
     if (!unpacked) throw new Error('无效的连接码')
@@ -209,6 +216,8 @@ export class ManualSignalingProvider extends Observable<string> {
       const msg = err instanceof Error ? err.message : String(err)
       this.setState({ status: 'error', error: msg })
       throw err
+    } finally {
+      this._creatingOffer = false
     }
   }
 
@@ -219,6 +228,14 @@ export class ManualSignalingProvider extends Observable<string> {
   async acceptAnswer(packedSdp: string): Promise<void> {
     if (this._disposed) throw new Error('Provider disposed')
     if (!this.pc) throw new Error('尚未创建连接，请先调用 createOffer()')
+
+    // 信令状态守卫：pc 必须处于 have-local-offer 状态才能接受 answer
+    // 如果被并发 createOffer() 重置了 pc，signalingState 会是 stable → 报清晰错误
+    if (this.pc.signalingState !== 'have-local-offer') {
+      throw new Error(
+        `连接状态异常 (${this.pc.signalingState})，请点击"发起连接"重新生成连接码`
+      )
+    }
 
     const unpacked = unpackSdp(packedSdp)
     if (!unpacked) throw new Error('无效的连接码')
