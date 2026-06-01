@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── 浅色主题「纸与陶土」 ──
+   午后阳光照在书桌上：暖白纸张 + 暖灰 + 陶土色 */
+:root {
+  --bg-primary: #FFFBF5;
+  --bg-secondary: #F3EFE9;
+  --bg-tertiary: #E8E1D7;
+  --bg-paper: #FDFAF2;
+  --border: #D9D0C5;
+  --border-light: #EBE5DC;
+  --text-primary: #3B332E;
+  --text-secondary: #8B8076;
+  --text-tertiary: #B8ADA2;
+  --accent: #C67B5C;
+  --accent-hover: #B06848;
+  --accent-light: #F5E6DD;
+  --danger: #D9705A;
+  --success: #7BA587;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+}
+
+/* ── 深色主题「陶土夜」 ── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #1E1B18;
+    --bg-secondary: #25221E;
+    --bg-tertiary: #302B26;
+    --bg-paper: #FDFAF2;  /* 纸张始终暖米白，不在暗色模式下变黑 */
+    --border: #3D3730;
+    --border-light: #302B26;
+    --text-primary: #E8E1D7;
+    --text-secondary: #A09588;
+    --text-tertiary: #756B60;
+    --accent: #D4956B;
+    --accent-hover: #E0AA85;
+    --accent-light: #3D2E24;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* ── 全局基础样式 ── */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* 禁止移动端双击缩放 */
+  touch-action: manipulation;
+}
+
+/* ── 自定义滚动条 ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* ── 纸张纹理背景 ── */
+.paper-texture {
+  background-color: var(--bg-paper);
+  background-image:
+    linear-gradient(0deg, transparent 24px, rgba(0,0,0,0.02) 25px),
+    linear-gradient(90deg, transparent 97%, rgba(0,0,0,0.03) 99%);
+  background-size: 25px 25px, 100% 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+  .paper-texture {
+    background-image:
+      linear-gradient(0deg, transparent 24px, rgba(255,255,255,0.02) 25px),
+      linear-gradient(90deg, transparent 97%, rgba(255,255,255,0.03) 99%);
+    background-size: 25px 25px, 100% 100%;
+  }
+}
+
+/* ── 工具类 ── */
+@layer components {
+  .btn-accent {
+    @apply bg-[var(--accent)] text-white px-4 py-2 rounded-lg
+           hover:bg-[var(--accent-hover)] transition-colors duration-150
+           active:scale-95 font-medium;
+  }
+  .btn-ghost {
+    @apply text-[var(--text-secondary)] px-3 py-2 rounded-lg
+           hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]
+           transition-colors duration-150 active:scale-95;
+  }
+  .btn-icon {
+    @apply w-9 h-9 flex items-center justify-center rounded-lg
+           text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]
+           hover:text-[var(--text-primary)] transition-colors duration-150
+           active:scale-90;
+  }
+  .btn-icon-active {
+    @apply btn-icon bg-[var(--accent-light)] text-[var(--accent)];
+  }
+  .panel {
+    @apply bg-[var(--bg-primary)] border border-[var(--border)]
+           rounded-lg shadow-sm;
+  }
+}
+
+/* ── 禁用 Canvas 元素选中（iPad Safari 书写时会出蓝色选框） ── */
+canvas {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ── 选中文字颜色 ── */
+::selection {
+  background-color: var(--accent-light);
+  color: var(--text-primary);
+}
