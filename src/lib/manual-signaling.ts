@@ -159,7 +159,7 @@ export class ManualSignalingProvider extends Observable<string> {
       await pc.setLocalDescription(offer)
 
       // 等待 ICE 候选收集完成
-      const packed = await this.waitForIceComplete(pc, 'offer')
+      const packed = await this.waitForIceComplete(pc)
       this.setState({ status: 'ready', localSdp: packed })
       return packed
     } catch (err) {
@@ -186,23 +186,23 @@ export class ManualSignalingProvider extends Observable<string> {
     const pc = this.createPeerConnection()
 
     try {
-      // 设置远程 Offer
-      await pc.setRemoteDescription(
-        new RTCSessionDescription({ type: 'offer', sdp: unpacked.sdp }),
-      )
-
-      // 数据通道由发起方创建，接收方监听 ondatachannel
+      // 先注册 ondatachannel（必须在 setRemoteDescription 之前，否则可能错过事件）
       pc.ondatachannel = (event) => {
         this.dc = event.channel
         this.setupDataChannel(this.dc)
       }
+
+      // 设置远程 Offer（触发 ICE 连接建立）
+      await pc.setRemoteDescription(
+        new RTCSessionDescription({ type: 'offer', sdp: unpacked.sdp }),
+      )
 
       // 创建 Answer
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
 
       // 等待 ICE 候选收集完成
-      const packed = await this.waitForIceComplete(pc, 'answer')
+      const packed = await this.waitForIceComplete(pc)
       this.setState({ status: 'ready', localSdp: packed })
       return packed
     } catch (err) {
@@ -259,7 +259,7 @@ export class ManualSignalingProvider extends Observable<string> {
     }
 
     this.setState({ status: 'disconnected', localSdp: null })
-    this.destroy()
+    // 调用 Observable 父类的 destroy 清理事件监听
     super.destroy?.()
   }
 
@@ -343,38 +343,36 @@ export class ManualSignalingProvider extends Observable<string> {
     this.dc.send(update.buffer)
   }
 
-  /** 等待 ICE 候选收集完成 */
-  private waitForIceComplete(pc: RTCPeerConnection, _type: 'offer' | 'answer'): Promise<string> {
+  /** 等待 ICE 候选收集完成，返回包含完整候选的打包 SDP */
+  private waitForIceComplete(pc: RTCPeerConnection): Promise<string> {
     return new Promise((resolve, reject) => {
-      const pack = () => {
+      const packNow = () => {
         if (!pc.localDescription || !pc.localDescription.sdp) {
           reject(new Error('本地 SDP 为空'))
           return
         }
-        const packed = packSdp(pc.localDescription, this.connId, this.roomKey)
-        resolve(packed)
+        resolve(packSdp(pc.localDescription, this.connId, this.roomKey))
       }
 
-      // 检查是否已经收集完成（部分浏览器会立即完成）
-      if (pc.localDescription) {
-        pack()
+      // 某些浏览器同步完成 ICE 收集
+      if (pc.iceGatheringState === 'complete') {
+        packNow()
         return
       }
 
-      // 设置 ICE 候选完成回调
+      // 监听 ICE 候选：event.candidate === null 表示收集完成
       const origHandler = pc.onicecandidate
       pc.onicecandidate = (event) => {
         origHandler?.call(pc, event)
         if (event.candidate === null) {
-          // null candidate 表示收集完成
-          pack()
+          packNow()
         }
       }
 
-      // 超时兜底：即使 ICE 未收集完也打包当前 SDP
+      // 5 秒超时兜底
       this._iceTimer = setTimeout(() => {
         console.warn('[ManualSignaling] ICE gathering timeout, using current SDP')
-        pack()
+        packNow()
       }, ICE_GATHER_TIMEOUT)
     })
   }

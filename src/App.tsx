@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import * as Y from 'yjs'
 import RoomGate from './components/room/RoomGate'
 import Sidebar from './components/layout/Sidebar'
@@ -51,7 +51,7 @@ export default function App() {
   }, [])
 
   /** 局域网直连回调 */
-  const handleLanConnect = (doc: Y.Doc, userId: string) => {
+  const handleLanConnect = (doc: Y.Doc, userId: string, _roomKey: string) => {
     setLan({ doc, userId })
   }
 
@@ -75,9 +75,7 @@ function RoomApp({ room }: { room: NonNullable<RoomState> }) {
 
 /** 局域网直连模式主界面 */
 function LanRoomApp({ lan }: { lan: LanState }) {
-  const userIdRef = useRef(lan.userId)
-  userIdRef.current = lan.userId
-  useLanSync(lan.doc, lan.userId, null)
+  useLanSync(lan.doc, lan.userId)
   useAutoSave(lan.userId)
   return <RoomUI />
 }

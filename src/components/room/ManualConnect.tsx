@@ -119,6 +119,7 @@ export default function ManualConnect({ onConnected, onBack, presetKey }: Props)
     }
     setError('')
     setLoading(true)
+    ensureDoc()
 
     try {
       await sync.acceptAnswer(remoteSdp.trim())

@@ -39,7 +39,7 @@ function createLocalSync(doc: Y.Doc): YjsSync {
   }
 }
 
-export function useLanSync(doc: Y.Doc, userId: string, friendId: string | null) {
+export function useLanSync(doc: Y.Doc, userId: string) {
   const syncRef = useRef<YjsSync | null>(null)
 
   /* ── 初始化 ── */
@@ -49,21 +49,11 @@ export function useLanSync(doc: Y.Doc, userId: string, friendId: string | null) 
     setGlobalSync(sync)
     ensureNotebookInDoc(sync.doc, userId, '我的笔记本')
 
-    // 设置对方为在线状态
-    if (friendId) {
-      useNotebookStore.getState().setPeerStatus({
-        userId: friendId,
-        isOnline: true,
-        currentPageIndex: 0,
-        mode: 'browse',
-      })
-    }
-
     return () => {
       setGlobalSync(null)
       syncRef.current = null
     }
-  }, [doc, userId, friendId])
+  }, [doc, userId])
 
   /* ── 我的笔记本 → Y.Doc ── */
   const myNotebook = useNotebookStore((s) => s.myNotebook)
@@ -166,6 +156,17 @@ export function useLanSync(doc: Y.Doc, userId: string, friendId: string | null) 
             updatedAt: Date.now(),
           }
           setFriendNotebook(friendNb)
+
+          // 自动检测对方在线：一旦发现非本机的 notebook 就设置 peerStatus
+          const currentPeer = useNotebookStore.getState().peerStatus
+          if (!currentPeer || currentPeer.userId !== key) {
+            useNotebookStore.getState().setPeerStatus({
+              userId: key,
+              isOnline: true,
+              currentPageIndex: data.currentPageIndex,
+              mode: 'browse',
+            })
+          }
         }
       })
     }
