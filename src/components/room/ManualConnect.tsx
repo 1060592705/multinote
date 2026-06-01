@@ -15,7 +15,7 @@ class EB extends Component<{ children: ReactNode; name: string }, { err: Error |
   constructor(props: { children: ReactNode; name: string }) { super(props); this.state = { err: null } }
   static getDerivedStateFromError(err: Error) { return { err } }
   render() {
-    if (this.state.err) return <div className="p-3 rounded bg-red-50 text-red-600 text-xs font-mono whitespace-pre-wrap">[{this.props.name}]\n{this.state.err.message}\n\n{this.state.err.stack?.split('\n').slice(0,8).join('\n')}</div>
+    if (this.state.err) return <div className="p-3 rounded bg-red-600 text-white text-xs font-mono whitespace-pre-wrap">[{this.props.name}]\n{this.state.err.message}\n\n{this.state.err.stack?.split('\n').slice(0,10).join('\n')}</div>
     return this.props.children
   }
 }
