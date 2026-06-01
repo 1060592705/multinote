@@ -9,6 +9,32 @@
   </head>
   <body class="bg-[#F5F5F5] dark:bg-[#0D0D0D]">
     <div id="root"></div>
+    <!-- 全局错误捕获 — 在所有 JS 之前安装 -->
+    <script>
+      window.__caughtErrors = [];
+      function showErrorBox(source, msg, stack) {
+        var old = document.getElementById('global-error-box');
+        if (old) old.remove();
+        var box = document.createElement('div');
+        box.id = 'global-error-box';
+        box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;padding:16px 20px;font-family:monospace;font-size:13px;line-height:1.6;white-space:pre-wrap;max-height:50vh;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+        box.textContent = '[' + source + '] ' + msg + '\n\n' + (stack || '(no stack)');
+        document.body.appendChild(box);
+        window.__caughtErrors.push({source:source, msg:msg, stack:stack, time:new Date().toISOString()});
+      }
+      // window.onerror 捕获同步错误
+      window.onerror = function(msg, file, line, col, error) {
+        var stack = (error && error.stack) || ('at ' + file + ':' + line + ':' + col);
+        showErrorBox('window.onerror', String(msg), stack);
+        return false; // 允许浏览器也记录
+      };
+      // unhandledrejection 捕获 Promise 错误
+      window.addEventListener('unhandledrejection', function(event) {
+        var reason = event.reason;
+        showErrorBox('unhandledrejection', reason && reason.message ? reason.message : String(reason), reason && reason.stack ? reason.stack : '');
+      });
+      console.log('[debug] index.html error handlers installed');
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
